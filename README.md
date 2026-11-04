@@ -266,13 +266,6 @@ plugin, refuses a version that is already on npm, prints the tarball contents
 and publishes with provenance, then pushes a `v<version>` tag and creates the
 GitHub release. `main` accepts pull requests only.
 
-Auth is npm trusted publishing (OIDC): the trusted publisher on npm is this
-workflow file in the `npm` environment:
-
-```bash
-npm trust github @memebattle/build-conditions --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish
-```
-
 The tarball contains `src/` (minus tests, stories and the test-only group
 declarations), the built `dist/` wasm, `README.md` and `LICENSE` — check it
 locally with `npm pack --dry-run` after `pnpm run build`.
