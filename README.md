@@ -248,6 +248,7 @@ export const decorators = [createBuildConditionsDecorator(conditionsConfig)];
 pnpm install
 pnpm run unit             # jest tests of the runtime helpers and the addon
 pnpm run typecheck        # tsc
+pnpm run fmt:check        # oxfmt
 pnpm run unit:swc-plugin  # cargo tests of the SWC plugin (unit + fixtures)
 pnpm run storybook        # interactive demo of the runtime mode
 pnpm run build            # build the wasm plugin into dist/

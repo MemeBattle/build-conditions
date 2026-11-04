@@ -8,7 +8,6 @@
         "type": "git",
         "url": "https://github.com/MemeBattle/build-conditions.git"
     },
-    "packageManager": "pnpm@12.16.1",
     "files": [
         "src",
         "dist",
@@ -16,10 +15,6 @@
         "!src/**/*.story.*",
         "!src/testGroups.d.ts"
     ],
-    "publishConfig": {
-        "access": "public",
-        "provenance": true
-    },
     "sideEffects": false,
     "exports": {
         ".": "./src/index.ts",
@@ -28,12 +23,17 @@
         "./swc-plugin": "./dist/swc_plugin_build_conditions.wasm",
         "./package.json": "./package.json"
     },
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    },
     "scripts": {
         "build": "run-s 'build:*'",
         "build:cleanup": "rm -rf dist && mkdir dist",
         "build:swc-plugin": "cd ./swc-plugin && cargo build --locked --target wasm32-wasip1 --release && cp ./target/wasm32-wasip1/release/swc_plugin_build_conditions.wasm ../dist/swc_plugin_build_conditions.wasm",
+        "fmt": "oxfmt",
+        "fmt:check": "oxfmt --check",
         "prepack": "test -f dist/swc_plugin_build_conditions.wasm || { echo 'dist/ is missing: run pnpm run build first' >&2; exit 1; }",
-        "prettier": "prettier --write '**/*.{js,jsx,ts,tsx,css,json,yaml,yml}'",
         "storybook": "storybook dev -p 9010 -c ./.config/storybook",
         "storybook:build": "storybook build -c ./.config/storybook --quiet",
         "typecheck": "tsc -b",
@@ -54,7 +54,7 @@
         "jest": "30.5.2",
         "jest-environment-jsdom": "30.5.2",
         "npm-run-all2": "9.0.4",
-        "prettier": "3.9.10",
+        "oxfmt": "0.75.0",
         "react": "19.3.1",
         "react-dom": "19.3.1",
         "storybook": "10.6.5",
@@ -68,5 +68,6 @@
         "react": {
             "optional": true
         }
-    }
+    },
+    "packageManager": "pnpm@12.16.1"
 }

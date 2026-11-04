@@ -1,5 +1,0 @@
-node_modules/
-dist/
-storybook-static/
-swc-plugin/target/
-pnpm-lock.yaml

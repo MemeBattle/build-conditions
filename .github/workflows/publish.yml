@@ -72,6 +72,7 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - run: pnpm run fmt:check
       - run: pnpm run typecheck
       - run: pnpm run unit
       - run: pnpm run unit:swc-plugin

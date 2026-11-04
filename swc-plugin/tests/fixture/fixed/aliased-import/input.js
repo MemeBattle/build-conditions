@@ -1,4 +1,7 @@
-import { switchBuildCondition as switchCondition, isBuildConditions as isConditions } from '@memebattle/build-conditions';
+import {
+    switchBuildCondition as switchCondition,
+    isBuildConditions as isConditions,
+} from '@memebattle/build-conditions';
 import desktopStyles from './styles@desktop.module.css';
 import mobileStyles from './styles@mobile.module.css';
 export const styles = switchCondition({
