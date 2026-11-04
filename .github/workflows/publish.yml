@@ -1,5 +1,6 @@
 # Manual release to npm. Run it from the Actions tab: it checks, builds the wasm
-# plugin, publishes the version from package.json and pushes a v<version> tag.
+# plugin, waits for a reviewer of the `npm` environment to approve, publishes
+# the version from package.json and pushes a v<version> tag.
 #
 # Auth: trusted publishing (OIDC, no secret) once the package exists on npm and
 # a trusted publisher pointing at this workflow is configured. For the very
@@ -31,6 +32,11 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Required reviewers on the environment gate the job; the trusted publisher
+    # on npm is bound to this environment too, so a run outside it cannot publish.
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@memebattle/build-conditions
     permissions:
       contents: write # push the release tag and create the GitHub release
       id-token: write # npm trusted publishing and provenance
