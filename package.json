@@ -8,6 +8,18 @@
         "type": "git",
         "url": "https://github.com/Themezv/build-conditions.git"
     },
+    "packageManager": "pnpm@10.5.0",
+    "files": [
+        "src",
+        "dist",
+        "!src/**/*.test.*",
+        "!src/**/*.story.*",
+        "!src/testGroups.d.ts"
+    ],
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    },
     "sideEffects": false,
     "exports": {
         ".": "./src/index.ts",
@@ -17,10 +29,10 @@
         "./package.json": "./package.json"
     },
     "scripts": {
-        "preinstall": "npx only-allow pnpm",
         "build": "run-s 'build:*'",
         "build:cleanup": "rm -rf dist && mkdir dist",
-        "build:swc-plugin": "cd ./swc-plugin && cargo build --target wasm32-wasip1 --release && cp ./target/wasm32-wasip1/release/swc_plugin_build_conditions.wasm ../dist/swc_plugin_build_conditions.wasm",
+        "build:swc-plugin": "cd ./swc-plugin && cargo build --locked --target wasm32-wasip1 --release && cp ./target/wasm32-wasip1/release/swc_plugin_build_conditions.wasm ../dist/swc_plugin_build_conditions.wasm",
+        "prepack": "test -f dist/swc_plugin_build_conditions.wasm || { echo 'dist/ is missing: run pnpm run build first' >&2; exit 1; }",
         "prettier": "prettier --write '**/*.{js,jsx,ts,tsx,css,json,yaml,yml}'",
         "storybook": "storybook dev -p 9010 -c ./.config/storybook",
         "storybook:build": "storybook build -c ./.config/storybook --quiet",
