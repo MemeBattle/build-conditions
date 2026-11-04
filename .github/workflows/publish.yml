@@ -98,7 +98,8 @@ jobs:
           level=error
           if [ "$DRY_RUN" = "true" ]; then level=warning; fi
           taken=0
-          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+          # ls-remote, not rev-parse: the checkout is shallow and has no tags
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
             echo "::$level::Tag v$version already exists; bump the version in package.json"
             taken=1
           fi
