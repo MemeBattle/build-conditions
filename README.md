@@ -259,20 +259,12 @@ pnpm run build            # build the wasm plugin into dist/
 Releases are published from GitHub Actions by hand: bump `version` in
 `package.json`, merge to `main`, then run the **Publish to npm** workflow from
 the Actions tab (pick the dist-tag; `dry-run` goes through every step except
-the publish). The workflow type-checks, runs the jest and cargo tests, builds
-the wasm plugin, refuses a version that is already on npm, prints the tarball
-contents and publishes with provenance, then pushes a `v<version>` tag and
-creates the GitHub release.
-
-Auth is npm trusted publishing (OIDC): no token lives in the repository. npm
-only lets you attach a trusted publisher to a package that already exists, so
-the first release goes through once with an `NPM_TOKEN` repository secret (a
-granular access token with publish rights). Right after it, register this
-workflow as the package's trusted publisher and delete the secret:
-
-```bash
-npm trust github @memebattle/build-conditions --repo MemeBattle/build-conditions --file publish.yml --allow-publish
-```
+the publish). The job runs in the `npm` environment, so it waits for one of
+the environment's required reviewers to approve it in the Actions UI before it
+starts. It then type-checks, runs the jest and cargo tests, builds the wasm
+plugin, refuses a version that is already on npm, prints the tarball contents
+and publishes with provenance, then pushes a `v<version>` tag and creates the
+GitHub release. `main` accepts pull requests only.
 
 The tarball contains `src/` (minus tests, stories and the test-only group
 declarations), the built `dist/` wasm, `README.md` and `LICENSE` — check it
