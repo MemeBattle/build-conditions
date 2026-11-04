@@ -86,17 +86,28 @@ jobs:
 
       - name: Read the version and make sure it is not on npm yet
         id: version
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+        # A dry run only reports a taken version, so the pipeline can be
+        # exercised between releases.
         run: |
           name=$(node -p "require('./package.json').name")
           version=$(node -p "require('./package.json').version")
           echo "name=$name" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
-            echo "::error::Tag v$version already exists; bump the version in package.json"
-            exit 1
+          level=error
+          if [ "$DRY_RUN" = "true" ]; then level=warning; fi
+          taken=0
+          # ls-remote, not rev-parse: the checkout is shallow and has no tags
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "::$level::Tag v$version already exists; bump the version in package.json"
+            taken=1
           fi
           if npm view "$name@$version" version >/dev/null 2>&1; then
-            echo "::error::$name@$version is already published; bump the version in package.json"
+            echo "::$level::$name@$version is already published; bump the version in package.json"
+            taken=1
+          fi
+          if [ "$taken" = 1 ] && [ "$DRY_RUN" != "true" ]; then
             exit 1
           fi
 
