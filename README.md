@@ -270,7 +270,7 @@ granular access token with publish rights). Right after it, register this
 workflow as the package's trusted publisher and delete the secret:
 
 ```bash
-npm trust github @memebattle/build-conditions --repo Themezv/build-conditions --file publish.yml --allow-publish
+npm trust github @memebattle/build-conditions --repo MemeBattle/build-conditions --file publish.yml --allow-publish
 ```
 
 The tarball contains `src/` (minus tests, stories and the test-only group
