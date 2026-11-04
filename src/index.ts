@@ -4,7 +4,7 @@
  * Consumers extend it via declaration merging:
  *
  * ```typescript
- * declare module 'build-conditions' {
+ * declare module '@memebattle/build-conditions' {
  *     interface BuildConditionGroups {
  *         platform: 'desktop' | 'mobile';
  *         runtime: 'server' | 'client';

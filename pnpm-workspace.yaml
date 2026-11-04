@@ -5,3 +5,11 @@ allowBuilds:
   core-js: false
   esbuild: false
   unrs-resolver: false
+
+# Supply-chain policy: a version must be at least a week old before it is installed
+minimumReleaseAge: 10080
+
+# Transitive dev-only advisories that jest has not picked up yet (GHSA on glob < 14.0.2, minimatch < 11.0.1)
+overrides:
+  glob: '>=14.0.2'
+  minimatch: '>=11.0.1'

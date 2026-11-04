@@ -1,4 +1,4 @@
-import { isBuildConditions } from 'build-conditions';
+import { isBuildConditions } from '@memebattle/build-conditions';
 import { initDesktopMenu } from './menu@desktop';
 import { initMobileMenu } from './menu@mobile';
 import { initServerLogger } from './logger@server';

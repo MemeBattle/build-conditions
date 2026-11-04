@@ -1,4 +1,4 @@
-//! SWC plugin of the `build-conditions` package.
+//! SWC plugin of the `@memebattle/build-conditions` package.
 //!
 //! Replaces `switchBuildCondition` / `isBuildConditions` calls with
 //! compile-time values according to the configuration:
@@ -32,7 +32,7 @@ use swc_core::plugin::{plugin_transform, proxies::TransformPluginProgramMetadata
 
 pub use transform::TransformVisitor;
 
-/// Plugin configuration, see `PluginOptions` in `build-conditions`
+/// Plugin configuration, see `PluginOptions` in `@memebattle/build-conditions`
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
     /// Complete composition of condition groups: group → all of its values

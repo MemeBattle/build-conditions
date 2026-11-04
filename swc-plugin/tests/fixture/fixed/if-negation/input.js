@@ -1,4 +1,4 @@
-import { isBuildConditions } from 'build-conditions';
+import { isBuildConditions } from '@memebattle/build-conditions';
 import { desktopOnly } from './desktopOnly';
 export function run() {
     if (!isBuildConditions('desktop')) {

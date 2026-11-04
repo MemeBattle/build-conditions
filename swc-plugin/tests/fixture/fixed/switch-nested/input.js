@@ -1,4 +1,4 @@
-import { switchBuildCondition } from 'build-conditions';
+import { switchBuildCondition } from '@memebattle/build-conditions';
 import PageWithStub from './PageWithStub';
 import Empty from './Empty';
 const stub = () => null;

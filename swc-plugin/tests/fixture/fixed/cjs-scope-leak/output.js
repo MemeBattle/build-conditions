@@ -1,5 +1,5 @@
 function a() {
-    const { switchBuildCondition: switchBuildCondition1 } = require('build-conditions');
+    const { switchBuildCondition: switchBuildCondition1 } = require('@memebattle/build-conditions');
     return 'desktop';
 }
 function b() {

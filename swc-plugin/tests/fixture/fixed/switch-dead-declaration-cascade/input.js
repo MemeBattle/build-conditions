@@ -1,4 +1,4 @@
-import { switchBuildCondition } from 'build-conditions';
+import { switchBuildCondition } from '@memebattle/build-conditions';
 import { getPassportHost } from './passport';
 import { track } from './track';
 const getAuthUrl = () => getPassportHost() + '/auth';

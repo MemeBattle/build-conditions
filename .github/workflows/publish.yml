@@ -1,0 +1,144 @@
+# Manual release to npm. Run it from the Actions tab: it checks, builds the wasm
+# plugin, publishes the version from package.json and pushes a v<version> tag.
+#
+# Auth: trusted publishing (OIDC, no secret) once the package exists on npm and
+# a trusted publisher pointing at this workflow is configured. For the very
+# first release, before trusted publishing can be configured, set the
+# NPM_TOKEN repository secret (a granular access token with publish rights);
+# the workflow uses it only when it is present. Remove the secret afterwards.
+name: Publish to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      dist-tag:
+        description: npm dist-tag
+        type: choice
+        options: [latest, next]
+        default: latest
+      dry-run:
+        description: Run every step except the publish and the tag push
+        type: boolean
+        default: false
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # push the release tag and create the GitHub release
+      id-token: write # npm trusted publishing and provenance
+    steps:
+      - name: Refuse a `latest` release from a non-default branch
+        if: inputs.dist-tag == 'latest' && github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::The latest tag is published from main only (got ${GITHUB_REF})"
+          exit 1
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: true # needed for the tag push below
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        # the pnpm version comes from the packageManager field of package.json
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: wasm32-wasip1
+
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          workspaces: swc-plugin
+
+      - name: Print tool versions
+        run: |
+          node --version
+          npm --version
+          pnpm --version
+          cargo --version
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run fmt:check
+      - run: pnpm run typecheck
+      - run: pnpm run unit
+      - run: pnpm run unit:swc-plugin
+      - run: pnpm run build
+
+      - name: Read the version and make sure it is not on npm yet
+        id: version
+        run: |
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "::error::Tag v$version already exists; bump the version in package.json"
+            exit 1
+          fi
+          if npm view "$name@$version" version >/dev/null 2>&1; then
+            echo "::error::$name@$version is already published; bump the version in package.json"
+            exit 1
+          fi
+
+      - name: Show what goes into the tarball
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e '
+            const [{ files, size, unpackedSize }] = require("./pack.json");
+            const names = files.map(f => f.path);
+            console.log(names.join("\n"));
+            console.log(`\n${names.length} files, ${size} B packed, ${unpackedSize} B unpacked`);
+            const stray = names.filter(n => /\.(test|story)\.|testGroups\.d\.ts|^swc-plugin\/|^\.config\//.test(n));
+            if (stray.length) {
+              console.error("Unexpected files in the tarball:\n" + stray.join("\n"));
+              process.exit(1);
+            }
+            if (!names.includes("dist/swc_plugin_build_conditions.wasm")) {
+              console.error("The wasm plugin is missing from the tarball");
+              process.exit(1);
+            }
+          '
+          rm pack.json
+
+      - name: Publish
+        if: ${{ !inputs.dry-run }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DIST_TAG: ${{ inputs.dist-tag }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "::notice::Publishing with the NPM_TOKEN secret. Configure trusted publishing and delete the secret after this release."
+            export NODE_AUTH_TOKEN="$NPM_TOKEN"
+          fi
+          npm publish --provenance --access public --tag "$DIST_TAG"
+
+      - name: Tag the release
+        if: ${{ !inputs.dry-run }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v$VERSION" -m "v$VERSION"
+          git push origin "v$VERSION"
+
+      - name: Create the GitHub release
+        if: ${{ !inputs.dry-run && inputs.dist-tag == 'latest' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: gh release create "v$VERSION" --title "v$VERSION" --generate-notes --verify-tag

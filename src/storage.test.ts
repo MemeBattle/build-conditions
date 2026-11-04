@@ -40,9 +40,7 @@ describe('setBuildConditionsStorage', () => {
     it('setBuildConditions throws when the storage does not support writes', () => {
         setBuildConditionsStorage({ get: () => ({ platform: 'desktop' }) });
 
-        expect(() => setBuildConditions({ platform: 'mobile' })).toThrow(
-            'storage does not support setBuildConditions'
-        );
+        expect(() => setBuildConditions({ platform: 'mobile' })).toThrow('storage does not support setBuildConditions');
     });
 
     it('an AsyncLocalStorage-backed storage isolates conditions of concurrent calls', async () => {
