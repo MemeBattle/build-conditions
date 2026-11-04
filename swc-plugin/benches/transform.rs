@@ -100,7 +100,7 @@ fn module_without_package(functions: usize) -> String {
 /// A module with switchBuildCondition calls, each branch holding a large value
 fn module_with_switches(calls: usize, branch_statements: usize) -> String {
     let mut src =
-        String::from("import { switchBuildCondition } from 'build-conditions';\n");
+        String::from("import { switchBuildCondition } from '@memebattle/build-conditions';\n");
 
     let branch_body = |name: &str| {
         let mut body = String::new();
@@ -131,7 +131,7 @@ fn module_with_switches(calls: usize, branch_statements: usize) -> String {
 /// declarations with a dependency chain down to an import
 fn module_with_dead_declarations(calls: usize) -> String {
     let mut src =
-        String::from("import { switchBuildCondition } from 'build-conditions';\n");
+        String::from("import { switchBuildCondition } from '@memebattle/build-conditions';\n");
 
     for i in 0..calls {
         let _ = writeln!(src, "import {{ mobileHelper{i} }} from './helper{i}';");
@@ -153,7 +153,7 @@ fn module_with_dead_declarations(calls: usize) -> String {
 /// Nested statically known ifs with dead else branches
 fn module_with_nested_ifs(depth: usize, leaf_statements: usize) -> String {
     let mut src = String::from(
-        "import { isBuildConditions } from 'build-conditions';\n\
+        "import { isBuildConditions } from '@memebattle/build-conditions';\n\
          export function main(arg) {\n",
     );
 
@@ -177,7 +177,7 @@ fn module_with_nested_ifs(depth: usize, leaf_statements: usize) -> String {
 /// A CommonJS script with a top-level require and helper calls inside functions
 fn script_with_requires(functions: usize) -> String {
     let mut src = String::from(
-        "const { isBuildConditions } = require('build-conditions');\n",
+        "const { isBuildConditions } = require('@memebattle/build-conditions');\n",
     );
 
     for i in 0..functions {

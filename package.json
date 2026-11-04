@@ -1,5 +1,5 @@
 {
-    "name": "build-conditions",
+    "name": "@memebattle/build-conditions",
     "version": "0.2.0",
     "description": "Build-time code splitting by arbitrary conditions: runtime helpers plus an SWC plugin that inlines branches and removes dead code",
     "license": "MIT",

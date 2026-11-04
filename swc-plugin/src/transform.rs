@@ -15,7 +15,7 @@ use swc_core::ecma::visit::{
 
 use crate::Config;
 
-const MODULE_SPECIFIER: &str = "build-conditions";
+const MODULE_SPECIFIER: &str = "@memebattle/build-conditions";
 const SWITCH_HELPER: &str = "switchBuildCondition";
 const IS_HELPER: &str = "isBuildConditions";
 const DEFAULT_KEY: &str = "default";

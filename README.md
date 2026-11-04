@@ -1,4 +1,4 @@
-# build-conditions
+# @memebattle/build-conditions
 
 Build-time code splitting by arbitrary conditions. You declare extensible
 **condition groups** (`platform`, `runtime`, build A/B experiments, and so on),
@@ -20,7 +20,7 @@ Groups are declared via declaration merging. Condition values must be unique
 across all groups — a value is resolved to its group by the value itself:
 
 ```typescript
-declare module 'build-conditions' {
+declare module '@memebattle/build-conditions' {
     interface BuildConditionGroups {
         platform: 'desktop' | 'mobile';
         runtime: 'server' | 'client';
@@ -36,7 +36,7 @@ Branches are functions or objects (e.g. React components or CSS Modules).
 The optional `default` branch is used when no key matches:
 
 ```typescript
-import { switchBuildCondition } from 'build-conditions';
+import { switchBuildCondition } from '@memebattle/build-conditions';
 import DesktopComponent from './Component@desktop';
 import MobileComponent from './Component@mobile';
 
@@ -52,7 +52,7 @@ A single condition or an array (all must be active at once). The group name is
 never spelled out — it is derived from the value:
 
 ```typescript
-import { isBuildConditions } from 'build-conditions';
+import { isBuildConditions } from '@memebattle/build-conditions';
 
 if (isBuildConditions(['desktop', 'client'])) {
     // code for the desktop client bundle only
@@ -78,7 +78,7 @@ The current conditions are read from a replaceable storage
 
 ```typescript
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { setBuildConditionsStorage, type PartialBuildConditions } from 'build-conditions';
+import { setBuildConditionsStorage, type PartialBuildConditions } from '@memebattle/build-conditions';
 
 const als = new AsyncLocalStorage<PartialBuildConditions>();
 
@@ -95,7 +95,7 @@ als.run({ platform: detectPlatform(req), runtime: 'server' }, () => {
 
 ## SWC plugin
 
-The `build-conditions/swc-plugin` entrypoint is a WASM plugin (`swc-plugin/`,
+The `@memebattle/build-conditions/swc-plugin` entrypoint is a WASM plugin (`swc-plugin/`,
 Rust, built against `swc_core` 79 — compatible with rspack 2.x; the
 `swc_ast_unknown` cfg keeps it working with newer swc_core runners). The configuration lists the complete composition of the
 groups plus the chosen value of each group — or `null` when the group is
@@ -122,7 +122,7 @@ Wiring it up (e.g. in an swc/rspack config, one build per set of conditions):
         experimental: {
             plugins: [
                 [
-                    require.resolve('build-conditions/swc-plugin'),
+                    require.resolve('@memebattle/build-conditions/swc-plugin'),
                     {
                         groups: { platform: ['desktop', 'mobile'], runtime: ['server', 'client'] },
                         conditions: { platform: 'desktop', runtime: 'client' },
@@ -142,7 +142,7 @@ and its import are removed:
 
 ```typescript
 // source
-import { switchBuildCondition } from 'build-conditions';
+import { switchBuildCondition } from '@memebattle/build-conditions';
 import DesktopComponent from './Component@desktop';
 import MobileComponent from './Component@mobile';
 
@@ -162,7 +162,7 @@ export const Component = DesktopComponent;
 
 ```typescript
 // source
-import { isBuildConditions } from 'build-conditions';
+import { isBuildConditions } from '@memebattle/build-conditions';
 
 if (isBuildConditions(['desktop', 'client'])) {
     initDesktopClient();
@@ -179,13 +179,13 @@ With `conditions: { platform: null, runtime: "client" }`:
 
 ```typescript
 // source
-import { isBuildConditions } from 'build-conditions';
+import { isBuildConditions } from '@memebattle/build-conditions';
 
 const isDesktop = isBuildConditions('desktop');
 const isServer = isBuildConditions('server');
 
 // output
-import { isBuildConditions } from 'build-conditions';
+import { isBuildConditions } from '@memebattle/build-conditions';
 
 const isDesktop = isBuildConditions('desktop'); // platform is runtime-switched
 const isServer = false; // runtime is fixed to 'client'
@@ -217,7 +217,7 @@ Rebuilding the wasm: `pnpm run build:swc-plugin` (requires Rust with the
 A per-story decorator:
 
 ```typescript
-import { withBuildConditions } from 'build-conditions/testing';
+import { withBuildConditions } from '@memebattle/build-conditions/testing';
 
 export default {
     decorators: [withBuildConditions({ platform: 'desktop', runtime: 'client' })],
@@ -225,14 +225,14 @@ export default {
 ```
 
 Switching conditions from the toolbar — the
-`build-conditions/storybook-addon` entrypoint:
+`@memebattle/build-conditions/storybook-addon` entrypoint:
 
 ```typescript
 // .storybook/preview.ts
 import {
     createBuildConditionsGlobalTypes,
     createBuildConditionsDecorator,
-} from 'build-conditions/storybook-addon';
+} from '@memebattle/build-conditions/storybook-addon';
 
 const conditionsConfig = {
     platform: { values: ['desktop', 'mobile'], defaultValue: 'desktop' },
@@ -270,7 +270,7 @@ granular access token with publish rights). Right after it, register this
 workflow as the package's trusted publisher and delete the secret:
 
 ```bash
-npm trust github build-conditions --repo Themezv/build-conditions --file publish.yml --allow-publish
+npm trust github @memebattle/build-conditions --repo Themezv/build-conditions --file publish.yml --allow-publish
 ```
 
 The tarball contains `src/` (minus tests, stories and the test-only group

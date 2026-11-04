@@ -1,4 +1,4 @@
-import { setBuildConditions, switchBuildCondition } from 'build-conditions';
+import { setBuildConditions, switchBuildCondition } from '@memebattle/build-conditions';
 setBuildConditions({
     platform: 'desktop',
 });

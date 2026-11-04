@@ -1,4 +1,4 @@
-import { isBuildConditions } from 'build-conditions';
+import { isBuildConditions } from '@memebattle/build-conditions';
 import { desktopClient } from './desktopClient';
 import { desktopServer } from './desktopServer';
 import { mobileImpl } from './mobileImpl';

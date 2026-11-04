@@ -1,4 +1,4 @@
-import { setBuildConditions } from 'build-conditions';
+import { setBuildConditions } from '@memebattle/build-conditions';
 setBuildConditions({
     platform: 'desktop',
 });

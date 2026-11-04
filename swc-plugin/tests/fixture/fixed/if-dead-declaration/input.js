@@ -1,4 +1,4 @@
-import { isBuildConditions } from 'build-conditions';
+import { isBuildConditions } from '@memebattle/build-conditions';
 import { format } from './format';
 const mobileFormat = value => format(value, 'mobile');
 export function run(value) {

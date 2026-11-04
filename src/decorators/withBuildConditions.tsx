@@ -9,7 +9,7 @@ export type BuildConditionsDecorator = (story: () => ReactNode) => ReactElement;
  * Storybook/test decorator: sets the build conditions before rendering a story.
  *
  * ```typescript
- * import { withBuildConditions } from 'build-conditions/testing';
+ * import { withBuildConditions } from '@memebattle/build-conditions/testing';
  *
  * export default {
  *     title: 'MyComponent',

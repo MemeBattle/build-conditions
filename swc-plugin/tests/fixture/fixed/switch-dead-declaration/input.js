@@ -1,4 +1,4 @@
-import { switchBuildCondition } from 'build-conditions';
+import { switchBuildCondition } from '@memebattle/build-conditions';
 import Cookies from 'js-cookie';
 import { getLoggerPlugin } from './logger';
 const createClientHost = () => ({

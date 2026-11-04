@@ -1,6 +1,6 @@
   x build-conditions: condition value 'desktpo' is not found in any group of the config (groups: platform, runtime)
    ,-[input.js:2:1]
- 1 | import { isBuildConditions } from 'build-conditions';
+ 1 | import { isBuildConditions } from '@memebattle/build-conditions';
  2 | export const flag = isBuildConditions('desktpo');
    :                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    `----

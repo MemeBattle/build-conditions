@@ -1,4 +1,4 @@
-import { switchBuildCondition } from 'build-conditions';
+import { switchBuildCondition } from '@memebattle/build-conditions';
 import { createLogger } from './logger';
 import { track } from './track';
 import { theme } from './theme';
