@@ -10,7 +10,9 @@
 //! - `nested_known_ifs` — nested statically known ifs (the branch is taken
 //!   by ownership instead of a deep clone);
 //! - `cjs_script_requires` — a CommonJS script (full traversal with a scope
-//!   per block).
+//!   per block);
+//! - `switch_dead_declarations` — switchBuildCondition whose branches reference
+//!   local declarations (cascading cleanup of declarations and imports).
 
 use std::fmt::Write as _;
 
@@ -125,6 +127,29 @@ fn module_with_switches(calls: usize, branch_statements: usize) -> String {
     src
 }
 
+/// A module with switchBuildCondition whose branches reference local
+/// declarations with a dependency chain down to an import
+fn module_with_dead_declarations(calls: usize) -> String {
+    let mut src =
+        String::from("import { switchBuildCondition } from 'build-conditions';\n");
+
+    for i in 0..calls {
+        let _ = writeln!(src, "import {{ mobileHelper{i} }} from './helper{i}';");
+    }
+
+    for i in 0..calls {
+        let _ = write!(
+            src,
+            "const mobileBase{i} = (arg) => mobileHelper{i}(arg);\n\
+             const mobileImpl{i} = (arg) => mobileBase{i}(arg);\n\
+             const desktopImpl{i} = (arg) => arg;\n\
+             export const value{i} = switchBuildCondition({{ desktop: desktopImpl{i}, mobile: mobileImpl{i} }});\n"
+        );
+    }
+
+    src
+}
+
 /// Nested statically known ifs with dead else branches
 fn module_with_nested_ifs(depth: usize, leaf_statements: usize) -> String {
     let mut src = String::from(
@@ -186,6 +211,12 @@ fn bench_transform(c: &mut Criterion) {
     );
     bench_case(c, "nested_known_ifs", &module_with_nested_ifs(50, 100), false);
     bench_case(c, "cjs_script_requires", &script_with_requires(500), true);
+    bench_case(
+        c,
+        "switch_dead_declarations",
+        &module_with_dead_declarations(200),
+        false,
+    );
 }
 
 criterion_group!(benches, bench_transform);

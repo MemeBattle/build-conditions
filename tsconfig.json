@@ -17,8 +17,8 @@
         "forceConsistentCasingInFileNames": true,
         "composite": true,
         "declaration": true,
-        "types": ["node", "jest", "testing-library__jest-dom"],
-        "typeRoots": ["node_modules/@types"],
+        "types": ["node", "jest", "@testing-library/jest-dom"],
+        "typeRoots": ["node_modules/@types", "node_modules"],
         "rootDir": "src",
         "outDir": "node_modules/.cache/tsbuild",
         "tsBuildInfoFile": "node_modules/.cache/.tsbuildinfo"

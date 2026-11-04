@@ -84,6 +84,19 @@ impl TransformVisitor {
         }
     }
 
+    fn visit_mut_scoped_stmts(&mut self, stmts: &mut Vec<Stmt>) {
+        if self.is_es_module {
+            stmts.visit_mut_with(self);
+
+            return;
+        }
+
+        // In CommonJS require can appear inside functions — open a scope
+        self.scopes.push(Scope::default());
+        stmts.visit_mut_with(self);
+        self.scopes.pop();
+    }
+
     fn current_scope(&mut self) -> &mut Scope {
         self.scopes
             .last_mut()
@@ -491,6 +504,122 @@ impl TransformVisitor {
         }
     }
 
+    /// Removes dead top-level declarations: non-exported `function` and
+    /// `const`/`let`/`var` with a simple name that were referenced from a dead
+    /// branch, are not used anywhere else in the module and have a provably
+    /// pure initializer. The identifiers of a removed declaration become new
+    /// candidates — repeat until a fixpoint. The occurrence counter is built
+    /// once and decremented by the identifiers of removed nodes
+    fn cleanup_declarations(&mut self, module: &mut Module) {
+        if !self.has_dead_candidates(module) {
+            return;
+        }
+
+        let mut counts = count_idents(&module.body);
+
+        loop {
+            let mut removed = false;
+
+            module.body.retain_mut(|item| {
+                let ModuleItem::Stmt(Stmt::Decl(decl)) = item else {
+                    return true;
+                };
+
+                match decl {
+                    Decl::Fn(fn_decl) => {
+                        if !self.is_dead(&fn_decl.ident.sym, &counts) {
+                            return true;
+                        }
+
+                        self.discard_counted(&*fn_decl.function, &mut counts);
+                        removed = true;
+
+                        false
+                    }
+                    Decl::Var(var) => {
+                        if var.declare {
+                            return true;
+                        }
+
+                        var.decls.retain(|declarator| {
+                            let Pat::Ident(name) = &declarator.name else {
+                                return true;
+                            };
+
+                            if !self.is_dead(&name.id.sym, &counts) {
+                                return true;
+                            }
+
+                            if let Some(init) = &declarator.init {
+                                if !is_pure_expr(init) {
+                                    return true;
+                                }
+
+                                self.discard_counted(&**init, &mut counts);
+                            }
+
+                            removed = true;
+
+                            false
+                        });
+
+                        !var.decls.is_empty()
+                    }
+                    _ => true,
+                }
+            });
+
+            if !removed {
+                break;
+            }
+        }
+    }
+
+    /// Whether any top-level declaration has a name from a dead branch
+    fn has_dead_candidates(&self, module: &Module) -> bool {
+        module.body.iter().any(|item| {
+            let ModuleItem::Stmt(Stmt::Decl(decl)) = item else {
+                return false;
+            };
+
+            match decl {
+                Decl::Fn(fn_decl) => self.discarded_idents.contains(&fn_decl.ident.sym),
+                Decl::Var(var) => var.decls.iter().any(|declarator| {
+                    matches!(
+                        &declarator.name,
+                        Pat::Ident(name) if self.discarded_idents.contains(&name.id.sym)
+                    )
+                }),
+                _ => false,
+            }
+        })
+    }
+
+    /// The name was in a dead branch and its only occurrence in the module is
+    /// the declaration itself
+    fn is_dead(&self, sym: &Atom, counts: &HashMap<Atom, usize>) -> bool {
+        self.discarded_idents.contains(sym) && counts.get(sym).copied() == Some(1)
+    }
+
+    /// Remembers the identifiers of a removed node as candidates and subtracts
+    /// them from the module occurrence counter
+    fn discard_counted<N: VisitWith<IdentCounter>>(
+        &mut self,
+        node: &N,
+        counts: &mut HashMap<Atom, usize>,
+    ) {
+        let mut counter = IdentCounter::default();
+        node.visit_with(&mut counter);
+
+        for (sym, count) in counter.counts {
+            if let Some(total) = counts.get_mut(&sym) {
+                *total = total.saturating_sub(count);
+            }
+
+            self.discarded_idents.insert(sym);
+        }
+    }
+
     /// Removes imports that became unused: package helpers with no remaining
     /// calls and identifiers from dead branches
     fn cleanup_imports(&mut self, module: &mut Module) {
@@ -524,6 +653,8 @@ impl TransformVisitor {
                     ImportSpecifier::Named(named) => &named.local,
                     ImportSpecifier::Default(default) => &default.local,
                     ImportSpecifier::Namespace(namespace) => &namespace.local,
+                    #[cfg(swc_ast_unknown)]
+                    _ => panic!("Unknown import specifier"),
                 };
 
                 if used.contains(&local.sym) {
@@ -540,12 +671,16 @@ impl TransformVisitor {
                                 Some(ModuleExportName::Ident(imported)) => imported.sym.as_str(),
                                 Some(ModuleExportName::Str(_)) => return true,
                                 None => named.local.sym.as_str(),
+                                #[cfg(swc_ast_unknown)]
+                                Some(_) => panic!("Unknown module export name"),
                             };
 
                             !matches!(export_name, SWITCH_HELPER | IS_HELPER)
                         }
                         ImportSpecifier::Namespace(_) => false,
                         ImportSpecifier::Default(_) => true,
+                        #[cfg(swc_ast_unknown)]
+                        _ => panic!("Unknown import specifier"),
                     }
                 } else {
                     // From other imports, only values from dead branches are removed
@@ -585,6 +720,7 @@ impl VisitMut for TransformVisitor {
 
         if self.did_transform {
             if let Program::Module(module) = node {
+                self.cleanup_declarations(module);
                 self.cleanup_imports(module);
             }
         }
@@ -614,11 +750,15 @@ impl VisitMut for TransformVisitor {
                             continue;
                         }
                         None => &named.local.sym,
+                        #[cfg(swc_ast_unknown)]
+                        Some(_) => panic!("Unknown module export name"),
                     };
 
                     self.register_export_name(export_name.as_str(), &named.local.sym);
                 }
                 ImportSpecifier::Default(_) => {}
+                #[cfg(swc_ast_unknown)]
+                _ => panic!("Unknown import specifier"),
             }
         }
     }
@@ -658,6 +798,8 @@ impl VisitMut for TransformVisitor {
                             self.register_export_name(key.sym.as_str(), &local.id.sym);
                         }
                         ObjectPatProp::Rest(_) => {}
+                        #[cfg(swc_ast_unknown)]
+                        _ => panic!("Unknown object pattern property"),
                     }
                 }
             }
@@ -666,16 +808,11 @@ impl VisitMut for TransformVisitor {
     }
 
     fn visit_mut_block_stmt(&mut self, node: &mut swc_core::ecma::ast::BlockStmt) {
-        if self.is_es_module {
-            node.visit_mut_children_with(self);
+        self.visit_mut_scoped_stmts(&mut node.stmts);
+    }
 
-            return;
-        }
-
-        // In CommonJS require can appear inside functions — open a scope
-        self.scopes.push(Scope::default());
-        node.visit_mut_children_with(self);
-        self.scopes.pop();
+    fn visit_mut_function_body(&mut self, node: &mut swc_core::ecma::ast::FunctionBody) {
+        self.visit_mut_scoped_stmts(&mut node.stmts);
     }
 
     fn visit_mut_stmt(&mut self, stmt: &mut Stmt) {
@@ -805,6 +942,72 @@ impl Visit for IdentCollector {
 
     fn visit_ident(&mut self, ident: &Ident) {
         self.idents.insert(ident.sym.clone());
+    }
+}
+
+/// Occurrence count of every identifier in the module outside imports;
+/// the declaration's own name counts as an occurrence too
+fn count_idents(items: &[ModuleItem]) -> HashMap<Atom, usize> {
+    let mut counter = IdentCounter::default();
+
+    for item in items {
+        if matches!(item, ModuleItem::ModuleDecl(ModuleDecl::Import(_))) {
+            continue;
+        }
+
+        item.visit_with(&mut counter);
+    }
+
+    counter.counts
+}
+
+#[derive(Default)]
+struct IdentCounter {
+    counts: HashMap<Atom, usize>,
+}
+
+impl Visit for IdentCounter {
+    noop_visit_type!();
+
+    fn visit_ident(&mut self, ident: &Ident) {
+        *self.counts.entry(ident.sym.clone()).or_default() += 1;
+    }
+}
+
+/// An expression without side effects on evaluation: functions, literals,
+/// identifiers and object/array literals made of such values
+fn is_pure_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::Arrow(_) | Expr::Fn(_) | Expr::Lit(_) | Expr::Ident(_) => true,
+        Expr::Tpl(tpl) => tpl.exprs.is_empty(),
+        Expr::Paren(paren) => is_pure_expr(&paren.expr),
+        Expr::TsAs(ts) => is_pure_expr(&ts.expr),
+        Expr::TsSatisfies(ts) => is_pure_expr(&ts.expr),
+        Expr::TsTypeAssertion(ts) => is_pure_expr(&ts.expr),
+        Expr::TsConstAssertion(ts) => is_pure_expr(&ts.expr),
+        Expr::TsNonNull(ts) => is_pure_expr(&ts.expr),
+        Expr::TsInstantiation(ts) => is_pure_expr(&ts.expr),
+        Expr::Array(array) => array.elems.iter().all(|elem| match elem {
+            None => true,
+            Some(elem) => elem.spread.is_none() && is_pure_expr(&elem.expr),
+        }),
+        Expr::Object(object) => object.props.iter().all(|prop| match prop {
+            PropOrSpread::Spread(_) => false,
+            PropOrSpread::Prop(prop) => match &**prop {
+                Prop::Shorthand(_) => true,
+                Prop::KeyValue(key_value) => {
+                    !matches!(key_value.key, PropName::Computed(_))
+                        && is_pure_expr(&key_value.value)
+                }
+                Prop::Method(method) => !matches!(method.key, PropName::Computed(_)),
+                Prop::Getter(getter) => !matches!(getter.key, PropName::Computed(_)),
+                Prop::Setter(setter) => !matches!(setter.key, PropName::Computed(_)),
+                _ => false,
+            },
+            #[cfg(swc_ast_unknown)]
+            _ => false,
+        }),
+        _ => false,
     }
 }
 

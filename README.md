@@ -96,8 +96,8 @@ als.run({ platform: detectPlatform(req), runtime: 'server' }, () => {
 ## SWC plugin
 
 The `build-conditions/swc-plugin` entrypoint is a WASM plugin (`swc-plugin/`,
-Rust; the `swc_core` version must be compatible with the swc plugin runner of
-the target bundler). The configuration lists the complete composition of the
+Rust, built against `swc_core` 79 — compatible with rspack 2.x; the
+`swc_ast_unknown` cfg keeps it working with newer swc_core runners). The configuration lists the complete composition of the
 groups plus the chosen value of each group — or `null` when the group is
 switched at runtime and must not be transformed:
 
@@ -202,7 +202,12 @@ The plugin resolves a condition value to its group via `groups`, so:
 - dead `if (isBuildConditions(...))` branches are removed together with
   imports that became unused; the exception is branches with `var`
   declarations (hoisting) — they are left as `if (false)` for the minifier
-  to finish off.
+  to finish off;
+- non-exported top-level declarations (`function`, `const`/`let`/`var` with a
+  simple name) that only a dead branch referenced are removed in a cascade
+  together with their imports, as long as the initializer is provably pure (a
+  function, a literal, an identifier, or an object/array literal made of such
+  values); calls, `new`, spread and destructuring are left to the minifier.
 
 Rebuilding the wasm: `pnpm run build:swc-plugin` (requires Rust with the
 `wasm32-wasip1` target). Tests: `pnpm run unit:swc-plugin`.

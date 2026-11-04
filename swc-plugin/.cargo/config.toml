@@ -1,0 +1,6 @@
+# Enables cross-version compatibility of the wasm plugin with future swc_core versions.
+# See https://swc.rs/docs/plugin/ecmascript/compatibility
+[target.'cfg(target_arch = "wasm32")']
+rustflags = [
+  "--cfg=swc_ast_unknown"
+]

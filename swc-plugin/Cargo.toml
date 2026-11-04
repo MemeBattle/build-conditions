@@ -16,15 +16,15 @@ strip = "symbols"
 serde = "1"
 serde_json = "1"
 # The swc_core version must be compatible with the swc plugin runner
-# of the target bundler (rspack / swc)
-swc_core = { version = "46", features = ["ecma_plugin_transform"] }
+# of the target bundler (rspack / swc); 79 matches rspack 2.x
+swc_core = { version = "79", features = ["ecma_plugin_transform"] }
 
 [dev-dependencies]
 criterion = "0.5"
 # Extra features for tests and benches only (parsing synthetic sources);
 # they do not affect the release wasm build
-swc_core = { version = "46", features = ["ecma_plugin_transform", "ecma_parser"] }
-testing = "17.0.0"
+swc_core = { version = "79", features = ["ecma_plugin_transform", "ecma_parser"] }
+testing = "27.0.0"
 
 [[bench]]
 name = "transform"
