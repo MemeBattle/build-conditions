@@ -1,12 +1,19 @@
 # Manual release to npm. Run it from the Actions tab: it checks, builds the wasm
-# plugin, waits for a reviewer of the `npm` environment to approve, publishes
-# the version from package.json and pushes a v<version> tag.
+# plugin and the Vite plugin, waits for a reviewer of the `npm` environment to
+# approve, publishes the three workspace packages in lockstep and pushes a
+# v<version> tag:
+#   @memebattle/build-conditions       (packages/core)
+#   @memebattle/build-conditions-swc   (packages/swc)
+#   @memebattle/build-conditions-vite  (packages/vite)
 #
-# Auth: trusted publishing (OIDC, no secret) once the package exists on npm and
-# a trusted publisher pointing at this workflow is configured. For the very
-# first release, before trusted publishing can be configured, set the
-# NPM_TOKEN repository secret (a granular access token with publish rights);
-# the workflow uses it only when it is present. Remove the secret afterwards.
+# Auth: trusted publishing (OIDC, no secret), bound per package to this
+# workflow and the `npm` environment. Trusted publishing can be configured only
+# for a package that already exists on npm, so the first release of a new
+# package name (0.3.0 for -swc and -vite) needs the NPM_TOKEN repository secret
+# (a granular access token with publish rights); the workflow uses it only when
+# it is present. After that release, bind each new name and delete the secret:
+#   npm trust github @memebattle/build-conditions-swc --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish
+#   npm trust github @memebattle/build-conditions-vite --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish
 name: Publish to npm
 
 on:
@@ -67,7 +74,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
-          workspaces: swc-plugin
+          workspaces: packages/swc
 
       - name: Print tool versions
         run: |
@@ -88,60 +95,69 @@ jobs:
         id: version
         env:
           DRY_RUN: ${{ inputs.dry-run }}
-        # A dry run only reports a taken version, so the pipeline can be
-        # exercised between releases.
+        # All packages share one version. A dry run only reports a taken
+        # version, so the pipeline can be exercised between releases; differing
+        # versions fail even then.
         run: |
-          name=$(node -p "require('./package.json').name")
-          version=$(node -p "require('./package.json').version")
-          echo "name=$name" >> "$GITHUB_OUTPUT"
+          version=$(node -p "require('./packages/core/package.json').version")
+          names=""
+          for dir in core swc vite; do
+            name=$(node -p "require('./packages/$dir/package.json').name")
+            own=$(node -p "require('./packages/$dir/package.json').version")
+            if [ "$own" != "$version" ]; then
+              echo "::error::$name is at $own, packages/core is at $version; all packages are released in lockstep"
+              exit 1
+            fi
+            names="$names $name"
+          done
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "names=${names# }" >> "$GITHUB_OUTPUT"
           level=error
           if [ "$DRY_RUN" = "true" ]; then level=warning; fi
           taken=0
           # ls-remote, not rev-parse: the checkout is shallow and has no tags
           if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
-            echo "::$level::Tag v$version already exists; bump the version in package.json"
+            echo "::$level::Tag v$version already exists; bump the version in packages/*/package.json"
             taken=1
           fi
-          if npm view "$name@$version" version >/dev/null 2>&1; then
-            echo "::$level::$name@$version is already published; bump the version in package.json"
-            taken=1
-          fi
+          for name in $names; do
+            if npm view "$name@$version" version >/dev/null 2>&1; then
+              echo "::$level::$name@$version is already published; bump the version in packages/*/package.json"
+              taken=1
+            fi
+          done
           if [ "$taken" = 1 ] && [ "$DRY_RUN" != "true" ]; then
             exit 1
           fi
 
-      - name: Show what goes into the tarball
+      # pnpm pack rewrites workspace: ranges and runs prepack; the inspected
+      # tarballs are the ones published below
+      - name: Pack and inspect the tarballs
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          npm pack --dry-run --json > pack.json
-          node -e '
-            const [{ files, size, unpackedSize }] = require("./pack.json");
-            const names = files.map(f => f.path);
-            console.log(names.join("\n"));
-            console.log(`\n${names.length} files, ${size} B packed, ${unpackedSize} B unpacked`);
-            const stray = names.filter(n => /\.(test|story)\.|testGroups\.d\.ts|^swc-plugin\/|^\.config\//.test(n));
-            if (stray.length) {
-              console.error("Unexpected files in the tarball:\n" + stray.join("\n"));
-              process.exit(1);
-            }
-            if (!names.includes("dist/swc_plugin_build_conditions.wasm")) {
-              console.error("The wasm plugin is missing from the tarball");
-              process.exit(1);
-            }
-          '
-          rm pack.json
+          for dir in core swc vite; do
+            (cd "packages/$dir" && pnpm pack --pack-destination "$RUNNER_TEMP/tarballs")
+          done
+          node .github/scripts/check-tarballs.mjs "$VERSION" "$RUNNER_TEMP"/tarballs/*.tgz
 
       - name: Publish
         if: ${{ !inputs.dry-run }}
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           DIST_TAG: ${{ inputs.dist-tag }}
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
           if [ -n "$NPM_TOKEN" ]; then
-            echo "::notice::Publishing with the NPM_TOKEN secret. Configure trusted publishing and delete the secret after this release."
+            echo "::notice::Publishing with the NPM_TOKEN secret. Configure trusted publishing for every package and delete the secret after this release."
             export NODE_AUTH_TOKEN="$NPM_TOKEN"
           fi
-          npm publish --provenance --access public --tag "$DIST_TAG"
+          for tarball in \
+            "$RUNNER_TEMP/tarballs/memebattle-build-conditions-$VERSION.tgz" \
+            "$RUNNER_TEMP/tarballs/memebattle-build-conditions-swc-$VERSION.tgz" \
+            "$RUNNER_TEMP/tarballs/memebattle-build-conditions-vite-$VERSION.tgz"; do
+            npm publish "$tarball" --provenance --access public --tag "$DIST_TAG"
+          done
 
       - name: Tag the release
         if: ${{ !inputs.dry-run }}
