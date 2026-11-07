@@ -9,9 +9,9 @@
 # Auth: trusted publishing (OIDC, no secret), bound per package to this
 # workflow and the `npm` environment. Trusted publishing can be configured only
 # for a package that already exists on npm, so the first release of a new
-# package name (0.3.0 for -swc and -vite) needs the NPM_TOKEN repository secret
-# (a granular access token with publish rights); the workflow uses it only when
-# it is present. After that release, bind each new name and delete the secret:
+# package name needs the NPM_TOKEN repository secret (a granular access token
+# with publish rights); the workflow uses it only when it is present. After
+# that release, bind each new name and delete the secret:
 #   npm trust github @memebattle/build-conditions-swc --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish
 #   npm trust github @memebattle/build-conditions-vite --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish
 name: Publish to npm

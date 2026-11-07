@@ -309,9 +309,8 @@ class Transformer {
     private readonly s: MagicString;
     private readonly scopes: Scope[] = [];
     private isEsModule = false;
-    /** Whether at least one transformation was performed in the module */
     private didTransform = false;
-    /** Identifiers from removed (dead) branches — import removal candidates */
+    /** Identifiers from dead branches: candidates for import removal */
     private readonly discarded = new Set<string>();
     readonly errors: TransformError[] = [];
 
@@ -436,7 +435,6 @@ class Transformer {
         return null;
     }
 
-    /** The call, if it is an isBuildConditions call */
     private asIsCall(expr: Node): Node | null {
         if (expr.type !== 'CallExpression' || expr.optional) {
             return null;
@@ -445,7 +443,6 @@ class Transformer {
         return this.resolveHelper(expr.callee as Node) === 'is' ? expr : null;
     }
 
-    /** Registers a helper by its export name from the package */
     private registerExportName(exportName: string, local: string): void {
         if (exportName === SWITCH_HELPER) {
             this.currentScope().switchLocal = local;
@@ -518,7 +515,7 @@ class Transformer {
 
     // ---- Condition evaluation
 
-    /** Status of a condition value. null — the value is not found in any group */
+    /** Status of a condition value, or null when the value is in no group */
     private resolveCondition(value: string): ConditionState | null {
         const group = this.config.valueToGroup.get(value);
 
@@ -549,7 +546,7 @@ class Transformer {
     /**
      * Extracts condition values from an isBuildConditions argument. A number
      * is the position of the error: the argument is neither a string literal
-     * nor an array of them
+     * nor an array of them.
      */
     private static extractIsValues(call: Node): string[] | number {
         const arg = (call.arguments as Node[])[0];
@@ -586,7 +583,7 @@ class Transformer {
         return values;
     }
 
-    /** Static evaluation of isBuildConditions values. A string — the unknown value */
+    /** Static evaluation of isBuildConditions values. `unknown` is the first value that is in no group */
     private evalIsValues(values: string[]): IsEval | { unknown: string } {
         let hasRuntime = false;
 
@@ -594,8 +591,8 @@ class Transformer {
             switch (this.resolveCondition(value)) {
                 case null:
                     return { unknown: value };
-                // A condition from a fixed group did not match — the whole
-                // call is statically false, even if other conditions are runtime
+                // A condition from a fixed group did not match: the whole call
+                // is statically false, even if other conditions are runtime
                 case 'inactiveFixed':
                     return false;
                 case 'runtime':
@@ -611,8 +608,8 @@ class Transformer {
 
     /**
      * Static evaluation of an if-statement test: a direct isBuildConditions
-     * call or its negation (incl. `!!`). No errors are emitted here — when the
-     * evaluation fails, the call goes through the regular expression path
+     * call or its negation (`!!` included). No errors are emitted here: when the
+     * evaluation fails, the call goes through the regular expression path.
      */
     private tryEvalIfTest(test: Node): boolean | null {
         if (test.type === 'UnaryExpression') {
@@ -678,7 +675,7 @@ class Transformer {
 
     private visitChildren(node: Node): void {
         const listKey = STATEMENT_LISTS.get(node.type);
-        // In CommonJS `require` can appear inside functions — open a scope
+        // In a script `require` can appear in any block, so each block opens a scope
         const scoped = !this.isEsModule && (node.type === 'BlockStatement' || node.type === 'StaticBlock');
 
         if (scoped) {
@@ -734,8 +731,8 @@ class Transformer {
         const alternate = node.alternate as Node | null;
         const dropped = result ? alternate : consequent;
 
-        // `var` from a removed branch hoists to the function level — such a
-        // branch is kept; the bundler and the minifier will finish off the `if (false)`
+        // A `var` in the dropped branch hoists out of it, so the `if` is kept
+        // as `if (false)` for the minifier
         if (dropped !== null && hasHoistedVar(dropped)) {
             return false;
         }
@@ -754,7 +751,7 @@ class Transformer {
             return true;
         }
 
-        // The branch stays a block — the let/const scope is preserved
+        // The taken branch keeps its braces, so its `let` and `const` stay block-scoped
         this.removeRange(node.start, taken.start);
         this.removeRange(taken.end, node.end);
         setSlot(parent, key, index, taken);
@@ -780,7 +777,7 @@ class Transformer {
     /**
      * Removes a statement. From a statement list it disappears entirely; any
      * other slot (an `if` branch, a loop body, a labeled statement) gets `;`,
-     * the counterpart of the swc `EmptyStmt` that is dropped from vectors only
+     * the counterpart of the swc `EmptyStmt` that is dropped from vectors only.
      */
     private deleteStatement(parent: Node, key: string, index: number | null, node: Node): void {
         if (this.isListSlot(parent, key, index)) {
@@ -844,7 +841,7 @@ class Transformer {
 
     /**
      * Transformation of `isBuildConditions(condition | [conditions])`. Returns
-     * a boolean literal or null if the call must stay in runtime
+     * a boolean literal, or null when the call stays in runtime mode.
      */
     private transformIs(call: Node): Node | null {
         const values = Transformer.extractIsValues(call);
@@ -900,7 +897,7 @@ class Transformer {
 
     /**
      * Transformation of `switchBuildCondition(map)`. Returns the replacement
-     * expression or null if the call must stay in runtime
+     * expression, or null when the call stays in runtime mode.
      */
     private transformSwitch(call: Node): Node | null {
         const arg = (call.arguments as Node[])[0];
@@ -936,8 +933,8 @@ class Transformer {
             keys.push(key);
         }
 
-        // Resolve the group of every branch; the keys (except default) must
-        // belong to a single group — same as in the types (SingleGroup)
+        // Resolve the group of every branch; the keys other than default must
+        // belong to one group, as the `SingleGroup` type requires
         let mapGroup: string | null = null;
 
         for (const key of keys) {
@@ -965,7 +962,7 @@ class Transformer {
             }
         }
 
-        // The map's group is not fixed — the call stays in runtime
+        // The map's group is in runtime mode: the call stays
         if (mapGroup !== null && (this.config.conditions.get(mapGroup) ?? null) === null) {
             return null;
         }
@@ -985,8 +982,8 @@ class Transformer {
             return null;
         }
 
-        // Dead-branch values are not kept — only their identifiers are
-        // collected for import cleanup. Inner switches were already folded.
+        // The losing values are dropped; their identifiers are collected for
+        // the import cleanup. Inner switches were already folded.
         properties.forEach((property, index) => {
             if (index !== winnerIndex) {
                 collectIdents(property.value as Node, this.discarded);
@@ -1015,8 +1012,8 @@ class Transformer {
      * `const`/`let`/`var` with a simple name that were referenced from a dead
      * branch, are not used anywhere else in the module and have a provably pure
      * initializer. The identifiers of a removed declaration become new
-     * candidates — repeat until a fixpoint. The occurrence counter is built once
-     * and decremented by the identifiers of removed nodes
+     * candidates, until a fixpoint. The occurrence counter is built once and
+     * decremented by the identifiers of removed nodes.
      */
     private cleanupDeclarations(program: Node): void {
         const counts = new Map<string, number>();
@@ -1118,7 +1115,7 @@ class Transformer {
 
     /**
      * Removes runs of declarators with their commas: up to the next kept
-     * declarator, or from the previous kept one for a run at the end
+     * declarator, or from the previous kept one for a run at the end.
      */
     private removeDeclarators(declarations: Node[], keep: boolean[]): void {
         let index = 0;
@@ -1149,7 +1146,7 @@ class Transformer {
 
     /**
      * Removes imports that became unused: package helpers with no remaining
-     * calls and identifiers from dead branches
+     * calls and identifiers from dead branches.
      */
     private cleanupImports(program: Node): void {
         const used = new Set<string>();
@@ -1187,8 +1184,8 @@ class Transformer {
                 }
 
                 // From the package import, only the transform helpers and the
-                // namespace are removed: runtime helpers (setBuildConditions
-                // etc.) are kept
+                // namespace are removed; runtime helpers such as
+                // `setBuildConditions` stay
                 if (specifier.type === 'ImportSpecifier') {
                     if (specifier.imported.type !== 'Identifier') {
                         return true;
@@ -1331,7 +1328,7 @@ class Transformer {
     /**
      * A winner that sat in the call's arguments (`[+In]`) may land in a
      * `for (init; …)` initializer (`[~In]`): `for (let f = 'a' in o; …)` would
-     * not parse, so a winner with a bare `in` is wrapped there
+     * not parse, so a winner with a bare `in` is wrapped there.
      */
     private forInitPass(): void {
         for (const node of this.moved) {
@@ -1612,7 +1609,7 @@ function isRequireFromModule(call: Node): boolean {
 /**
  * Whether the module references the package at the top level: an import with
  * its specifier or a var declaration with a `require` of the package in the
- * initializer
+ * initializer.
  */
 function moduleReferencesPackage(program: Node): boolean {
     return (program.body as Node[]).some(item => {

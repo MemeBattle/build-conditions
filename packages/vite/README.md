@@ -2,7 +2,7 @@
 
 The Vite plugin of [`@memebattle/build-conditions`](https://www.npmjs.com/package/@memebattle/build-conditions):
 it inlines the matching condition branch and removes the dead ones together
-with their imports at build time, in `vite build` and `vite dev`.
+with their imports, in both `vite build` and `vite dev`.
 
 ```bash
 pnpm add -D @memebattle/build-conditions-vite

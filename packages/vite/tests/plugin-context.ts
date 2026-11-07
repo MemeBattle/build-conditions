@@ -11,7 +11,7 @@ type Handler = (this: unknown, code: string, id: string) => { code: string; map:
 
 /**
  * A hand-written fake of the plugin context: `error` records its argument
- * (and the separate position argument in `positions`) and throws
+ * (and the separate position argument in `positions`) and throws.
  */
 export function fakeContext(): {
     errors: RecordedError[];

@@ -1,8 +1,8 @@
 /**
  * The shared `fixtures/` suite: the same cases and configs as
  * `packages/swc/tests/fixture.rs`. The expected `output.js` files are swc
- * codegen, the port keeps the original formatting, so outputs are compared as
- * normalized oxc ASTs.
+ * codegen and the port keeps the original formatting, so outputs are compared
+ * as normalized oxc ASTs.
  */
 import { existsSync, readFileSync } from 'node:fs';
 
@@ -57,7 +57,7 @@ function stderrMessage(stderr: string): string {
 
 /**
  * The offset of the reported span: the source line before the caret line gives
- * the line number, the first `^` column minus the gutter gives the column
+ * the line number, the first `^` column minus the gutter gives the column.
  */
 function stderrOffset(stderr: string, input: string): number {
     const lines = stderr.split('\n');

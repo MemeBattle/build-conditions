@@ -5,8 +5,9 @@ const config: UserConfig = defineConfig({
     format: 'esm',
     platform: 'node',
     target: 'node20.19',
-    // oxc isolated declarations. The type import from @memebattle/build-conditions
-    // (a workspace devDependency) stays external, so consumer augmentation applies
+    // Declarations come from oxc isolated declarations. The type import from
+    // @memebattle/build-conditions (a workspace devDependency) stays external,
+    // so the consumer's augmentation applies
     dts: true,
     deps: { neverBundle: ['@memebattle/build-conditions'] },
     fixedExtension: false,

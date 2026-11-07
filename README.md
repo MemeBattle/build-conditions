@@ -180,10 +180,10 @@ export default defineConfig({
 
 - The plugin is `enforce: 'pre'`: it runs before `@vitejs/plugin-react`,
   which still sees the JSX it needs for Fast Refresh.
-- The config is the one of the SWC plugin, with the same semantics: a group set
-  to `null` stays in runtime mode. It applies to `vite build` and `vite dev`
+- The config and its semantics are those of the SWC plugin: a group set to
+  `null` stays in runtime mode. It applies to `vite build` and `vite dev`
   alike; an invalid config throws when `buildConditions()` is called.
-- Build errors use the messages of the SWC plugin and arrive with a code frame.
+- Build errors carry the messages of the SWC plugin and a code frame.
 - A hook filter skips every file whose code does not mention
   `@memebattle/build-conditions`. Files under `node_modules` and ids with a
   query (`?raw`, `?worker`) are not transformed.
@@ -336,11 +336,12 @@ workflow from the Actions tab (pick the dist-tag; `dry-run` goes through every
 step except the publish). The job runs in the `npm` environment, so it waits
 for one of the environment's required reviewers to approve it in the Actions
 UI before it starts. It then checks formatting, type-checks, runs the jest and
-cargo tests and builds both plugins. It refuses differing versions, a version
-whose tag exists or that any of the packages already has on npm, packs the
-three tarballs with `pnpm pack`, prints and checks their contents, publishes
-each of them with provenance, then pushes a `v<version>` tag and creates the
-GitHub release. `main` accepts pull requests only.
+cargo tests and builds both plugins. It stops when the package versions
+differ, when the `v<version>` tag exists or when any of the packages already
+has that version on npm. Otherwise it packs the three tarballs with
+`pnpm pack`, prints and checks their contents, publishes each of them with
+provenance, then pushes a `v<version>` tag and creates the GitHub release.
+`main` accepts pull requests only.
 
 The tarballs contain `README.md`, `LICENSE` and:
 

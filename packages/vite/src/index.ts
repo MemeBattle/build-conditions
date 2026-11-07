@@ -33,7 +33,7 @@ export function buildConditions(options: BuildConditionsPluginOptions): Plugin {
 
     return {
         name: 'build-conditions',
-        // Before @vitejs/plugin-react, which still sees JSX for Fast Refresh
+        // Runs before @vitejs/plugin-react, so that plugin still sees JSX for Fast Refresh
         enforce: 'pre',
         transform: {
             filter: {
@@ -43,7 +43,7 @@ export function buildConditions(options: BuildConditionsPluginOptions): Plugin {
             handler(code, id) {
                 const filename = id.replace(/[?#].*$/, '');
 
-                // Defensive: hosts that ignore hook filters
+                // The filter's checks again, for hosts that ignore hook filters
                 if (
                     !SCRIPT_ID.test(filename) ||
                     filename.includes('/node_modules/') ||

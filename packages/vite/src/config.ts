@@ -5,7 +5,7 @@
 export interface ResolvedConfig {
     /** Condition value → its group name */
     valueToGroup: Map<string, string>;
-    /** Group → fixed value (null — the group is switched at runtime) */
+    /** Group → its fixed value, or null for a group in runtime mode */
     conditions: Map<string, string | null>;
     /** Sorted group names, listed in the unknown-value error */
     groupNames: string[];
@@ -27,7 +27,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /**
  * Validates the configuration and builds the "condition value → its group" map.
  *
- * Checked invariants (the messages are the ones of the Rust plugin):
+ * Checked invariants, with the messages of the Rust plugin:
  * - the group sets in `groups` and `conditions` match;
  * - condition values are unique across groups;
  * - a fixed value belongs to its group.
