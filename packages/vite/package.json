@@ -1,0 +1,52 @@
+{
+    "name": "@memebattle/build-conditions-vite",
+    "version": "0.3.0",
+    "description": "Vite plugin of @memebattle/build-conditions: inlines condition branches and removes dead code at build time",
+    "license": "MIT",
+    "author": "Artem Zverev <themezv@gmail.com>",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/MemeBattle/build-conditions.git",
+        "directory": "packages/vite"
+    },
+    "files": [
+        "dist"
+    ],
+    "type": "module",
+    "sideEffects": false,
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "default": "./dist/index.js"
+        },
+        "./package.json": "./package.json"
+    },
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    },
+    "scripts": {
+        "build": "tsdown",
+        "prepack": "test -f dist/index.js && test -f dist/index.d.ts || { echo 'dist/ is missing: run pnpm run build first' >&2; exit 1; }"
+    },
+    "dependencies": {
+        "magic-string": "^1.4.5",
+        "oxc-parser": "^0.156.0"
+    },
+    "devDependencies": {
+        "@jridgewell/trace-mapping": "0.3.31",
+        "@memebattle/build-conditions": "workspace:*",
+        "@vitejs/plugin-react": "6.1.2",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
+        "tsdown": "0.23.4",
+        "vite": "8.3.5",
+        "vite-7": "npm:vite@7.3.7"
+    },
+    "peerDependencies": {
+        "vite": ">=6.3.0"
+    },
+    "engines": {
+        "node": "^20.19.0 || >=22.12.0"
+    }
+}

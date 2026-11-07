@@ -90,7 +90,7 @@ export type UniqueConditionValuesGuard = [DuplicateConditionValues] extends [nev
     ? unknown
     : 'Error: condition value is used in more than one group';
 
-/** SWC plugin configuration */
+/** Configuration of the SWC and Vite plugins */
 export interface PluginOptions {
     /**
      * Complete composition of condition groups: group → all of its values.

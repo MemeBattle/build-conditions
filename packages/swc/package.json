@@ -1,0 +1,28 @@
+{
+    "name": "@memebattle/build-conditions-swc",
+    "version": "0.3.0",
+    "description": "SWC wasm plugin of @memebattle/build-conditions: inlines condition branches and removes dead code at build time",
+    "license": "MIT",
+    "author": "Artem Zverev <themezv@gmail.com>",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/MemeBattle/build-conditions.git",
+        "directory": "packages/swc"
+    },
+    "files": [
+        "dist"
+    ],
+    "exports": {
+        ".": "./dist/swc_plugin_build_conditions.wasm",
+        "./package.json": "./package.json"
+    },
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    },
+    "scripts": {
+        "build": "rm -rf dist && mkdir dist && cargo build --locked --target wasm32-wasip1 --release && cp target/wasm32-wasip1/release/swc_plugin_build_conditions.wasm dist/",
+        "prepack": "test -f dist/swc_plugin_build_conditions.wasm || { echo 'dist/ is missing: run pnpm run build first' >&2; exit 1; }",
+        "test": "cargo test"
+    }
+}
