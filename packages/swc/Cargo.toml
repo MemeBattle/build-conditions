@@ -15,8 +15,9 @@ strip = "symbols"
 [dependencies]
 serde = "1"
 serde_json = "1"
-# The swc_core version must be compatible with the swc plugin runner
-# of the target bundler (rspack / swc); 79 matches rspack 2.x
+# The swc_core version must be compatible with the swc plugin runner of the
+# target bundler (rspack / swc); newer runners stay compatible through the
+# `swc_ast_unknown` cfg (see .cargo/config.toml)
 swc_core = { version = "79", features = ["ecma_plugin_transform"] }
 
 [dev-dependencies]

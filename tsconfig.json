@@ -1,27 +1,4 @@
 {
-    "compilerOptions": {
-        "target": "esnext",
-        "module": "esnext",
-        "moduleResolution": "bundler",
-        "lib": ["esnext", "dom", "dom.iterable"],
-        "jsx": "react-jsx",
-        "resolveJsonModule": true,
-        "skipLibCheck": true,
-        "esModuleInterop": true,
-        "allowSyntheticDefaultImports": true,
-        "isolatedModules": true,
-        "strict": true,
-        "noImplicitReturns": true,
-        "noUncheckedIndexedAccess": true,
-        "noImplicitOverride": true,
-        "forceConsistentCasingInFileNames": true,
-        "composite": true,
-        "declaration": true,
-        "types": ["node", "jest", "@testing-library/jest-dom"],
-        "typeRoots": ["node_modules/@types", "node_modules"],
-        "rootDir": "src",
-        "outDir": "node_modules/.cache/tsbuild",
-        "tsBuildInfoFile": "node_modules/.cache/.tsbuildinfo"
-    },
-    "include": ["src"]
+    "files": [],
+    "references": [{ "path": "packages/core" }, { "path": "packages/vite" }]
 }

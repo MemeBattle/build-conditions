@@ -3,16 +3,30 @@
 Build-time code splitting by arbitrary conditions. You declare extensible
 **condition groups** (`platform`, `runtime`, build A/B experiments, and so on),
 branch your code with two tiny helpers, and get per-condition bundles: an SWC
-plugin inlines the matching branch and removes the dead ones together with
-their imports. Without the plugin the same code keeps working at runtime, so
+or Vite plugin inlines the matching branch and removes the dead ones together
+with their imports. Without a plugin the same code keeps working at runtime, so
 tests, Storybook and dev setups need no special build.
 
 - **Type-safe** — condition values are checked by TypeScript; mixing groups or
   misspelling a value is a compile-time error.
-- **Runtime fallback** — every helper has a runtime implementation; the SWC
-  plugin is an optimization, not a requirement.
+- **Runtime fallback** — every helper has a runtime implementation; the build
+  plugins are an optimization, not a requirement.
 - **Whole-branch elimination** — dead branches disappear from the bundle along
   with the imports only they used.
+
+## Packages
+
+The repository is a pnpm workspace of three packages, released together under
+one version number:
+
+| Package                                              | Purpose                                                                            | Dependencies                                                         |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| [`@memebattle/build-conditions`](packages/core)      | the runtime helpers, `./testing`, `./storybook-addon` and the `PluginOptions` type | none; `react` is an optional peer                                    |
+| [`@memebattle/build-conditions-swc`](packages/swc)   | the SWC wasm plugin (swc, rspack, Next.js)                                         | none                                                                 |
+| [`@memebattle/build-conditions-vite`](packages/vite) | the Vite plugin, a JS port of the SWC plugin                                       | `oxc-parser`, `magic-string`; `vite >=6.3` peer (7 and 8 are tested) |
+
+Neither plugin depends on the core package at runtime. Install the core
+package as a dependency and one of the plugins as a dev dependency.
 
 ## Declaring condition groups
 
@@ -59,7 +73,7 @@ if (isBuildConditions(['desktop', 'client'])) {
 }
 ```
 
-Without the SWC plugin both helpers work at runtime: `switchBuildCondition`
+Without a build plugin both helpers work at runtime: `switchBuildCondition`
 returns a wrapper (an HOC for functions, a Proxy for objects) that resolves
 the branch on every access, and `isBuildConditions` reads the current
 conditions from the storage.
@@ -95,10 +109,10 @@ als.run({ platform: detectPlatform(req), runtime: 'server' }, () => {
 
 ## SWC plugin
 
-The `@memebattle/build-conditions/swc-plugin` entrypoint is a WASM plugin (`swc-plugin/`,
-Rust, built against `swc_core` 79 — compatible with rspack 2.x; the
-`swc_ast_unknown` cfg keeps it working with newer swc_core runners). The configuration lists the complete composition of the
-groups plus the chosen value of each group — or `null` when the group is
+`@memebattle/build-conditions-swc` is a WASM plugin (`packages/swc/`, Rust,
+built against `swc_core` 79; the `swc_ast_unknown` cfg keeps it working with
+newer swc_core runners). The configuration lists the complete composition of
+the groups plus the chosen value of each group — or `null` when the group is
 switched at runtime and must not be transformed:
 
 ```json
@@ -122,7 +136,7 @@ Wiring it up (e.g. in an swc/rspack config, one build per set of conditions):
         experimental: {
             plugins: [
                 [
-                    require.resolve('@memebattle/build-conditions/swc-plugin'),
+                    require.resolve('@memebattle/build-conditions-swc'),
                     {
                         groups: { platform: ['desktop', 'mobile'], runtime: ['server', 'client'] },
                         conditions: { platform: 'desktop', runtime: 'client' },
@@ -133,6 +147,53 @@ Wiring it up (e.g. in an swc/rspack config, one build per set of conditions):
     },
 }
 ```
+
+## Vite plugin
+
+`@memebattle/build-conditions-vite` brings the same transform to Vite, whose
+Rolldown and Oxc pipeline has no SWC and does not load wasm plugins. It is a JS
+port of the SWC plugin: it parses with `oxc-parser` and edits only the helper
+call sites, the dead branches, the dead declarations and the dead imports with
+`magic-string`. Types, comments and formatting everywhere else stay as they
+were, and a hires sourcemap maps the result back.
+
+```bash
+pnpm add -D @memebattle/build-conditions-vite
+```
+
+```typescript
+// vite.config.ts
+import { buildConditions } from '@memebattle/build-conditions-vite';
+import react from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+    plugins: [
+        buildConditions({
+            groups: { platform: ['desktop', 'mobile'], runtime: ['server', 'client'] },
+            conditions: { platform: 'desktop', runtime: 'client' },
+        }),
+        react(),
+    ],
+});
+```
+
+- The plugin is `enforce: 'pre'`: it runs before `@vitejs/plugin-react`,
+  which still sees the JSX it needs for Fast Refresh.
+- The config and its semantics are those of the SWC plugin: a group set to
+  `null` stays in runtime mode. It applies to `vite build` and `vite dev`
+  alike; an invalid config throws when `buildConditions()` is called.
+- Build errors carry the messages of the SWC plugin and a code frame.
+- A hook filter skips every file whose code does not mention
+  `@memebattle/build-conditions`. Files under `node_modules` and ids with a
+  query (`?raw`, `?worker`) are not transformed.
+- The options are typed by your `BuildConditionGroups` declaration when the
+  `vite.config.ts` program sees it (for example through the `include` of
+  `tsconfig.node.json`); otherwise they fall back to plain string records.
+
+## Transforms of both plugins
+
+The examples and rules below apply to the SWC and the Vite plugin alike.
 
 ### Transformation examples
 
@@ -191,9 +252,9 @@ const isDesktop = isBuildConditions('desktop'); // platform is runtime-switched
 const isServer = false; // runtime is fixed to 'client'
 ```
 
-### Rules enforced by the plugin
+### Rules enforced by the plugins
 
-The plugin resolves a condition value to its group via `groups`, so:
+The plugins resolve a condition value to its group via `groups`, so:
 
 - helper arguments must be literals (a string or an array of strings; the
   branch map — an object literal); passing anything dynamic is a build error —
@@ -209,8 +270,15 @@ The plugin resolves a condition value to its group via `groups`, so:
   function, a literal, an identifier, or an object/array literal made of such
   values); calls, `new`, spread and destructuring are left to the minifier.
 
-Rebuilding the wasm: `pnpm run build:swc-plugin` (requires Rust with the
-`wasm32-wasip1` target). Tests: `pnpm run unit:swc-plugin`.
+### Shared fixtures
+
+Both plugins are tested against the cases in `fixtures/` at the repository
+root (`fixed/`, `partial/` and `errors/`, each with an `input.js` and the
+expected `output.js` or `output.stderr`), so no case is added to one plugin
+without the other. The expected outputs are swc codegen: regenerate them with
+`UPDATE=1 cargo test --test fixture` in `packages/swc` and review the diff. The
+jest suite of the Vite plugin runs the same cases with the same configs and
+compares normalized ASTs, because the port keeps the original formatting.
 
 ## Storybook
 
@@ -244,31 +312,56 @@ export const decorators = [createBuildConditionsDecorator(conditionsConfig)];
 
 ## Development
 
+All commands run from the repository root:
+
 ```bash
 pnpm install
-pnpm run unit             # jest tests of the runtime helpers and the addon
-pnpm run typecheck        # tsc
+pnpm run unit             # jest: the runtime helpers and the addon (core), the Vite plugin (vite)
+pnpm run typecheck        # tsc -b over packages/core and packages/vite
 pnpm run fmt:check        # oxfmt
 pnpm run unit:swc-plugin  # cargo tests of the SWC plugin (unit + fixtures)
 pnpm run storybook        # interactive demo of the runtime mode
-pnpm run build            # build the wasm plugin into dist/
+pnpm run build            # packages/swc/dist (wasm, needs Rust with wasm32-wasip1) and packages/vite/dist (tsdown)
 ```
+
+The Vite plugin can be tried in `vite dev` on the integration test project:
+`cd packages/vite && pnpm exec vite --config tests/project/vite.config.mts tests/project`.
 
 ## Releasing
 
-Releases are published from GitHub Actions by hand: bump `version` in
-`package.json`, merge to `main`, then run the **Publish to npm** workflow from
-the Actions tab (pick the dist-tag; `dry-run` goes through every step except
-the publish). The job runs in the `npm` environment, so it waits for one of
-the environment's required reviewers to approve it in the Actions UI before it
-starts. It then type-checks, runs the jest and cargo tests, builds the wasm
-plugin, refuses a version that is already on npm, prints the tarball contents
-and publishes with provenance, then pushes a `v<version>` tag and creates the
-GitHub release. `main` accepts pull requests only.
+The three packages are released together, under one version number. Releases
+are published from GitHub Actions by hand: bump `version` in all three
+`packages/*/package.json`, merge to `main`, then run the **Publish to npm**
+workflow from the Actions tab (pick the dist-tag; `dry-run` goes through every
+step except the publish). The job runs in the `npm` environment, so it waits
+for one of the environment's required reviewers to approve it in the Actions
+UI before it starts. It then checks formatting, type-checks, runs the jest and
+cargo tests and builds both plugins. It stops when the package versions
+differ, when the `v<version>` tag exists or when any of the packages already
+has that version on npm. Otherwise it packs the three tarballs with
+`pnpm pack`, prints and checks their contents, publishes each of them with
+provenance, then pushes a `v<version>` tag and creates the GitHub release.
+`main` accepts pull requests only.
 
-The tarball contains `src/` (minus tests, stories and the test-only group
-declarations), the built `dist/` wasm, `README.md` and `LICENSE` — check it
-locally with `npm pack --dry-run` after `pnpm run build`.
+The tarballs contain `README.md`, `LICENSE` and:
+
+- `@memebattle/build-conditions`: `src/` minus tests, stories and the
+  test-only group declarations;
+- `@memebattle/build-conditions-swc`: `dist/swc_plugin_build_conditions.wasm`;
+- `@memebattle/build-conditions-vite`: `dist/index.js` and `dist/index.d.ts`.
+
+Check them locally with `pnpm run build`, then `pnpm pack` in each package
+directory and `node .github/scripts/check-tarballs.mjs <version> *.tgz`.
+
+Each package publishes through npm trusted publishing, bound to the workflow
+and the `npm` environment. Trusted publishing can be bound only to a package
+that exists, so the first release of a new package name goes out with a
+temporary `NPM_TOKEN` repository secret (a granular access token with publish
+rights). After that release, bind the new name with
+`npm trust github <name> --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish`
+and delete the secret. If a release fails after publishing some of the
+packages, rerunning it hits the version guard: bump the patch version and
+release again.
 
 ## License
 
