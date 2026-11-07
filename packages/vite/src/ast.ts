@@ -226,8 +226,9 @@ export function isPureExpr(expr: Node): boolean {
 /**
  * Whether the statement contains `var` declarations that hoist out of it, a
  * port of `HoistedVarFinder`. Nested functions are not descended into: they
- * have their own scope. Getters, setters and class constructors are, because
- * swc models their bodies without a `Function` node.
+ * have their own scope. Class constructors are, because swc's `Constructor`
+ * holds a bare body without a `Function` node; getters, setters and methods
+ * (object or class) carry a `Function` in swc and are skipped like any other.
  */
 export function hasHoistedVar(stmt: Node): boolean {
     let found = false;
@@ -260,12 +261,5 @@ export function hasHoistedVar(stmt: Node): boolean {
 }
 
 function isSwcBodyWithoutFunction(parent: Node | null): boolean {
-    if (parent === null) {
-        return false;
-    }
-    if (parent.type === 'Property') {
-        return parent.kind === 'get' || parent.kind === 'set';
-    }
-
-    return parent.type === 'MethodDefinition' && parent.kind === 'constructor';
+    return parent !== null && parent.type === 'MethodDefinition' && parent.kind === 'constructor';
 }

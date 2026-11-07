@@ -84,9 +84,13 @@ describe('vite integration', () => {
     );
 
     test.each(['error-build-8', 'error-build-7'])(
-        '%s: the build fails with the plugin message',
+        '%s: the build fails with the plugin message, a location and a code frame',
         scenario => {
-            expect(runVite<ErrorReport>(scenario).message).toContain(UNKNOWN_TABLET);
+            const error = runVite<ErrorReport>(scenario);
+
+            expect(error.message).toContain(UNKNOWN_TABLET);
+            expect(error.loc?.line).toBe(4);
+            expect(error.frame).toEqual(expect.stringContaining("isBuildConditions('tablet')"));
         },
         TIMEOUT
     );

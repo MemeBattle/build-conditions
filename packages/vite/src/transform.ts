@@ -172,9 +172,31 @@ const TERMINATED_STATEMENTS = new Set(['BlockStatement', 'FunctionDeclaration', 
 /** A statement starting with one of these may continue the previous one */
 const HAZARDOUS_LEADING = new Set(['(', '[', '`', '+', '-', '/', '<']);
 
-const IDENT_CHAR = /[\p{ID_Continue}$‌‍]/u;
+/** A code point of an identifier; `\` starts or continues an escape (`\u0061`, `\u{61}`) */
+const IDENT_CHAR = /^[\p{ID_Continue}$‌‍\\]$/u;
 
-/** Whether two adjacent characters would fuse into one token (or start a comment) */
+/** The whole code point that ends at `index` (a surrogate pair included) */
+function codePointBefore(text: string, index: number): string | undefined {
+    const cp = index >= 2 ? text.codePointAt(index - 2) : undefined;
+
+    if (cp !== undefined && cp > 0xffff) {
+        return String.fromCodePoint(cp);
+    }
+
+    return index >= 1 ? text[index - 1] : undefined;
+}
+
+/** The whole code point that starts at `index` */
+function codePointAt(text: string, index: number): string | undefined {
+    const cp = text.codePointAt(index);
+
+    return cp === undefined ? undefined : String.fromCodePoint(cp);
+}
+
+/**
+ * Whether two adjacent code points would fuse into one token (or start a
+ * comment). Conservative: an extra space is always harmless.
+ */
 function joins(a: string | undefined, b: string | undefined): boolean {
     if (a === undefined || b === undefined) {
         return false;
@@ -224,6 +246,48 @@ function leftOperand(node: Node): Node | null {
             return node.expression as Node;
         default:
             return null;
+    }
+}
+
+/**
+ * Whether the child in `parent[key]` is parsed with the `[+In]` parameter
+ * whatever the context of `parent`: parentheses, function and class bodies,
+ * array and object literals and patterns, arguments, computed member
+ * properties, template substitutions, JSX and the consequent of `? :`. An
+ * arrow's concise body inherits the context.
+ */
+function resetsInContext(parent: Node, key: string): boolean {
+    switch (parent.type) {
+        case 'ParenthesizedExpression':
+        case 'FunctionExpression':
+        case 'FunctionDeclaration':
+        case 'ArrayExpression':
+        case 'ObjectExpression':
+        case 'ArrayPattern':
+        case 'ObjectPattern':
+        case 'JSXElement':
+        case 'JSXFragment':
+        case 'JSXExpressionContainer':
+        case 'ImportExpression':
+            return true;
+        case 'ArrowFunctionExpression':
+            return key === 'params' || parent.body.type === 'BlockStatement';
+        case 'ClassExpression':
+        case 'ClassDeclaration':
+            return key === 'body';
+        case 'CallExpression':
+        case 'NewExpression':
+            return key === 'arguments';
+        case 'MemberExpression':
+            return key === 'property' && parent.computed === true;
+        case 'TemplateLiteral':
+            return key === 'expressions';
+        case 'TaggedTemplateExpression':
+            return key === 'quasi';
+        case 'ConditionalExpression':
+            return key === 'consequent';
+        default:
+            return false;
     }
 }
 
@@ -1192,7 +1256,9 @@ class Transformer {
      * The rules swc's fixer and printer apply for free, applied to the text over
      * the final tree. Each pass reads the `wrapped` Set of the earlier ones, and
      * the `;` of pass 3 must land before the `(` of passes 1 and 2:
-     * 1. precedence: a winner is wrapped in parentheses by the slot it finally lands in;
+     * 1. precedence: a winner is wrapped in parentheses by the slot it finally
+     *    lands in, and a winner with a bare `in` inside a `for (init; …)`
+     *    initializer, where the grammar is `[~In]`;
      * 2. leading tokens: `{`, `function`, `class`, `let [` never start an
      *    expression statement, `function` / `class` an `export default`
      *    expression, `{` an arrow's expression body;
@@ -1204,6 +1270,7 @@ class Transformer {
     private finalPasses(program: Node): void {
         this.tree = indexTree(program);
         this.precedencePass();
+        this.forInitPass();
         this.leadingTokenPass();
         this.statementBoundaryPass();
         this.tokenBoundaryPass();
@@ -1259,6 +1326,71 @@ class Transformer {
 
             this.wrap(node);
         }
+    }
+
+    /**
+     * A winner that sat in the call's arguments (`[+In]`) may land in a
+     * `for (init; …)` initializer (`[~In]`): `for (let f = 'a' in o; …)` would
+     * not parse, so a winner with a bare `in` is wrapped there
+     */
+    private forInitPass(): void {
+        for (const node of this.moved) {
+            if (!this.wrapped.has(node) && this.inForInit(node) && this.hasBareIn(node)) {
+                this.wrap(node);
+            }
+        }
+    }
+
+    /** Whether the node is in a `for` initializer with no `[+In]` reset in between */
+    private inForInit(node: Node): boolean {
+        let child = node;
+
+        for (;;) {
+            const slot = this.tree.get(child);
+
+            if (slot === undefined || slot.parent === null) {
+                return false;
+            }
+
+            const { parent, key } = slot;
+
+            if (parent.type === 'ForStatement') {
+                return key === 'init';
+            }
+
+            if (this.wrapped.has(parent) || resetsInContext(parent, key)) {
+                return false;
+            }
+
+            child = parent;
+        }
+    }
+
+    /** Whether the subtree has an `in` operator outside parentheses and other `[+In]` resets */
+    private hasBareIn(root: Node): boolean {
+        let found = false;
+
+        const walk = (node: Node): void => {
+            if (found || isTypeNode(node)) {
+                return;
+            }
+
+            if ((node.type === 'BinaryExpression' && node.operator === 'in') || node.type === 'PrivateInExpression') {
+                found = true;
+
+                return;
+            }
+
+            forEachChild(node, (child, parent, key) => {
+                if (!this.wrapped.has(child) && !resetsInContext(parent, key)) {
+                    walk(child);
+                }
+            });
+        };
+
+        walk(root);
+
+        return found;
     }
 
     private needsParens(node: Node, parent: Node, key: string): boolean {
@@ -1421,11 +1553,18 @@ class Transformer {
             // The emitted text of the node, insertions of passes 1-3 included
             const emitted = this.emittedText(node);
 
-            if (!this.insertedBefore.has(node.start) && joins(this.code[start - 1], emitted[0])) {
+            const before = codePointBefore(this.code, start);
+            const after = codePointAt(this.code, end);
+
+            if (!this.insertedBefore.has(node.start) && joins(before, codePointAt(emitted, 0))) {
                 this.s.prependRight(node.start, ' ');
             }
 
-            if (!this.insertedAfter.has(node.end) && joins(emitted.at(-1), this.code[end])) {
+            const last = codePointBefore(emitted, emitted.length);
+            // A trailing `}` may close an identifier escape (`\u{61}in`)
+            const closesEscape = last === '}' && after !== undefined && IDENT_CHAR.test(after);
+
+            if (!this.insertedAfter.has(node.end) && (closesEscape || joins(last, after))) {
                 this.s.appendLeft(node.end, ' ');
             }
         }

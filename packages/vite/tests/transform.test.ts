@@ -522,6 +522,8 @@ describe('helper calls', () => {
 
         expect(() => pluginHandler(FIXED_OPTIONS).call(context, input, '/src/x.js')).toThrow();
         expect(context.errors).toEqual([result.errors[0]]);
+        // The position also goes as the second argument: the build contexts read only that one
+        expect(context.positions).toEqual([result.errors[0]?.pos]);
     });
 });
 
@@ -580,5 +582,101 @@ describe('token boundaries', () => {
         runInNewContext(output, context);
 
         expect(context.r).toBe(true);
+    });
+
+    test('escaped and astral identifiers', () => {
+        const input = readFileSync(`${caseDir('fixed', 'token-boundaries-escaped')}input.js`, 'utf8');
+        const output = transform(input);
+
+        expect(output).toBe(
+            [
+                "import { a, obj, table } from './values';",
+                '',
+                'export const kind = typeof \\u0061;',
+                'export const braced = typeof \\u{61};',
+                'export const found = \\u{61} in obj;',
+                'export const plain = \\u0061 in table;',
+                'export const astral = typeof 𝑥;',
+                'export const astralRight = 𝑥 in table;',
+                'export const object = {} in table;',
+                '',
+            ].join('\n')
+        );
+        reparse(output);
+    });
+
+    test('an escaped identifier after typeof is executed as typeof', () => {
+        const output = transform(
+            `${REQUIRE_SWITCH}var a = {}, typeofa = 'wrong';\nvar r = typeof(0, switchBuildCondition)({ desktop: \\u0061, mobile: 1 });\n`
+        );
+        const context = { require: () => ({}) } as Record<string, unknown>;
+
+        runInNewContext(output, context);
+
+        expect(context.r).toBe('object');
+    });
+});
+
+describe('for initializers', () => {
+    test('the shared fixture', () => {
+        const input = readFileSync(`${caseDir('fixed', 'for-init-in')}input.js`, 'utf8');
+        const output = transform(input);
+
+        expect(output).toBe(
+            [
+                "import { obj, Alpha, Beta, left, right } from './values';",
+                '',
+                "for (let fn = ('a' in obj ? Alpha : Beta); fn; ) break;",
+                '',
+                'let target;',
+                "for (target = ('a' in left);;) break;",
+                '',
+                "for (const getter = () => ('a' in right);;) break;",
+                '',
+                "for (var arrow = (() => 'x' in obj); arrow;) break;",
+                '',
+                "for (let safe = ['a' in obj]; safe;) break;",
+                '',
+            ].join('\n')
+        );
+        reparse(output);
+    });
+
+    test.each([
+        [
+            'parenthesized already',
+            "for (let x = switchBuildCondition({ desktop: ('a' in o), mobile: 1 });;) break;",
+            "for (let x = ('a' in o);;) break;",
+        ],
+        [
+            'nested winners',
+            "for (let x = switchBuildCondition({ desktop: switchBuildCondition({ desktop: 'a' in o, mobile: 2 }), mobile: 1 });;) break;",
+            "for (let x = ('a' in o);;) break;",
+        ],
+        [
+            'a conditional consequent',
+            "for (let x = switchBuildCondition({ desktop: a ? 'a' in o : b, mobile: 1 });;) break;",
+            "for (let x = a ? 'a' in o : b;;) break;",
+        ],
+        [
+            'a for-of right side',
+            "for (const x of switchBuildCondition({ desktop: ['a' in o], mobile: [] })) break;",
+            "for (const x of ['a' in o]) break;",
+        ],
+        [
+            'the loop body',
+            "for (;;) { x = switchBuildCondition({ desktop: 'a' in o, mobile: 1 }); break; }",
+            "for (;;) { x = 'a' in o; break; }",
+        ],
+        [
+            'a function body',
+            "for (let f = function () { return switchBuildCondition({ desktop: 'a' in o, mobile: 1 }); };;) break;",
+            "for (let f = function () { return 'a' in o; };;) break;",
+        ],
+    ])('no extra parentheses: %s', (_, input, expected) => {
+        const output = transform(`${IMPORT_SWITCH}${input}\n`);
+
+        expect(output).toBe(`${expected}\n`);
+        reparse(output);
     });
 });

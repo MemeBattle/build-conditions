@@ -35,9 +35,11 @@ function report(value: unknown): void {
 }
 
 function errorReport(error: unknown): ErrorReport {
-    const { message, loc, frame } = error as ErrorReport;
+    const { message, loc, frame, errors } = error as ErrorReport & { errors?: ErrorReport[] };
+    // Rolldown throws an aggregate "Build failed" error that carries the plugin errors in `errors`
+    const [first] = errors ?? [];
 
-    return { message, loc, frame };
+    return { message, loc: first?.loc ?? loc, frame: first?.frame ?? frame };
 }
 
 async function build(vite: ViteModule, config: InlineConfig, html: string, major: 7 | 8): Promise<unknown> {

@@ -9,14 +9,24 @@ export interface RecordedError {
 
 type Handler = (this: unknown, code: string, id: string) => { code: string; map: unknown } | null;
 
-/** A hand-written fake of the plugin context: `error` records its argument and throws */
-export function fakeContext(): { errors: RecordedError[]; error: (error: RecordedError) => never } {
+/**
+ * A hand-written fake of the plugin context: `error` records its argument
+ * (and the separate position argument in `positions`) and throws
+ */
+export function fakeContext(): {
+    errors: RecordedError[];
+    positions: (number | undefined)[];
+    error: (error: RecordedError, pos?: number) => never;
+} {
     const errors: RecordedError[] = [];
+    const positions: (number | undefined)[] = [];
 
     return {
         errors,
-        error(error: RecordedError): never {
+        positions,
+        error(error: RecordedError, pos?: number): never {
             errors.push(error);
+            positions.push(pos);
 
             throw Object.assign(new Error(error.message), { pos: error.pos });
         },

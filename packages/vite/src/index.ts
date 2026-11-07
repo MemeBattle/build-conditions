@@ -56,7 +56,8 @@ export function buildConditions(options: BuildConditionsPluginOptions): Plugin {
                 const [error] = result.errors;
 
                 if (error !== undefined) {
-                    this.error({ message: error.message, pos: error.pos });
+                    // The build contexts of Rollup and Rolldown add loc and frame only from the second argument
+                    this.error({ message: error.message, pos: error.pos }, error.pos);
                 }
 
                 if (result.map === null) {
