@@ -1,0 +1,54 @@
+{
+    "name": "@memebattle/build-conditions",
+    "version": "0.3.0",
+    "description": "Build-time code splitting by arbitrary conditions: runtime helpers and types; the SWC and Vite plugins live in @memebattle/build-conditions-swc and @memebattle/build-conditions-vite",
+    "license": "MIT",
+    "author": "Artem Zverev <themezv@gmail.com>",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/MemeBattle/build-conditions.git",
+        "directory": "packages/core"
+    },
+    "files": [
+        "src",
+        "!src/**/*.test.*",
+        "!src/**/*.story.*",
+        "!src/testGroups.d.ts"
+    ],
+    "sideEffects": false,
+    "exports": {
+        ".": "./src/index.ts",
+        "./testing": "./src/testing.ts",
+        "./storybook-addon": "./src/addon/index.ts",
+        "./package.json": "./package.json"
+    },
+    "publishConfig": {
+        "access": "public",
+        "provenance": true
+    },
+    "scripts": {
+        "storybook": "storybook dev -p 9010 -c ./.config/storybook",
+        "storybook:build": "storybook build -c ./.config/storybook --quiet"
+    },
+    "devDependencies": {
+        "@rsbuild/core": "2.2.14",
+        "@storybook/react": "10.6.5",
+        "@testing-library/dom": "10.4.2",
+        "@testing-library/jest-dom": "7.0.1",
+        "@testing-library/react": "16.3.3",
+        "@types/react": "19.3.0",
+        "jest-environment-jsdom": "30.5.2",
+        "react": "19.3.1",
+        "react-dom": "19.3.1",
+        "storybook": "10.6.5",
+        "storybook-react-rsbuild": "3.6.1"
+    },
+    "peerDependencies": {
+        "react": "^18.0.0 || ^19.0.0"
+    },
+    "peerDependenciesMeta": {
+        "react": {
+            "optional": true
+        }
+    }
+}

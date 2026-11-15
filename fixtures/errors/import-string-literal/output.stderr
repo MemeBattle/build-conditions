@@ -1,0 +1,6 @@
+  x build-conditions: string literals in imports are not supported
+   ,-[input.js:1:1]
+ 1 | import { 'isBuildConditions' as isConditions } from '@memebattle/build-conditions';
+   : ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 2 | export const flag = isConditions('desktop');
+   `----

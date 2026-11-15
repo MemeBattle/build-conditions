@@ -1,3 +1,6 @@
+packages:
+  - 'packages/*'
+
 # true — the package may run its build scripts, false — its build is skipped
 allowBuilds:
   '@parcel/watcher': false

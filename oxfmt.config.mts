@@ -1,11 +1,11 @@
 import { defineConfig } from 'oxfmt';
 
 export default defineConfig({
-    // .gitignore covers node_modules, dist, storybook-static and swc-plugin/target
+    // .gitignore covers node_modules, dist, storybook-static and packages/swc/target
     ignorePatterns: [
         'pnpm-lock.yaml',
-        // Plugin test fixtures: output.js comes from the swc codegen, input.js is kept as written
-        'swc-plugin/tests/fixture/',
+        // Shared plugin test fixtures: output.js comes from the swc codegen, input.js is kept as written
+        'fixtures/',
     ],
     singleQuote: true,
     arrowParens: 'avoid',
