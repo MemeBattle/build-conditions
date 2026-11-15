@@ -27,6 +27,8 @@ const rules = {
         !files.includes('dist/index.d.ts') && 'dist/index.d.ts is missing',
         ...files.filter(file => /^(src|tests)\//.test(file)).map(file => `unexpected file ${file}`),
         manifest.includes('workspace:') && 'package.json still has a workspace: range',
+        !JSON.parse(manifest).peerDependencies?.['@memebattle/build-conditions'] &&
+            'package.json has no @memebattle/build-conditions peer dependency',
         files.includes('dist/index.d.ts') &&
             !read('dist/index.d.ts').includes('@memebattle/build-conditions') &&
             'dist/index.d.ts does not import the types of @memebattle/build-conditions',

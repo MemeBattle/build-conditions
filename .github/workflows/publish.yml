@@ -6,14 +6,18 @@
 #   @memebattle/build-conditions-swc   (packages/swc)
 #   @memebattle/build-conditions-vite  (packages/vite)
 #
-# Auth: trusted publishing (OIDC, no secret), bound per package to this
-# workflow and the `npm` environment. Trusted publishing can be configured only
-# for a package that already exists on npm, so the first release of a new
-# package name needs the NPM_TOKEN repository secret (a granular access token
-# with publish rights); the workflow uses it only when it is present. After
-# that release, bind each new name and delete the secret:
-#   npm trust github @memebattle/build-conditions-swc --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish
-#   npm trust github @memebattle/build-conditions-vite --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish
+# Auth: trusted publishing only (OIDC, no secret), bound per package to this
+# workflow and the `npm` environment. Trusted publishing can be bound only to a
+# package that already exists on npm, so a maintainer publishes the first
+# version of a new package name once by hand, from the packed tarball, then
+# binds the name:
+#   npm trust github <name> --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish
+# and runs this workflow for the same version, which publishes the rest.
+#
+# Resuming: the Publish step skips a package whose name@version is already on
+# npm, so rerunning a release that failed halfway publishes only what is left
+# and then pushes the tag. The version guard fails only when the v<version>
+# tag exists, and warns about packages that are already published.
 name: Publish to npm
 
 on:
@@ -91,13 +95,15 @@ jobs:
       - run: pnpm run unit:swc-plugin
       - run: pnpm run build
 
-      - name: Read the version and make sure it is not on npm yet
+      - name: Read the version and make sure it is not released yet
         id: version
         env:
           DRY_RUN: ${{ inputs.dry-run }}
-        # All packages share one version. A dry run only reports a taken
-        # version, so the pipeline can be exercised between releases; differing
-        # versions fail even then.
+        # All packages share one version. The release is finished once its tag
+        # exists, so only the tag fails the run; packages already on npm are a
+        # resumed release (or a first version published by hand) and only
+        # warn. A dry run only reports an existing tag, so the pipeline can be
+        # exercised between releases; differing versions fail even then.
         run: |
           version=$(node -p "require('./packages/core/package.json').version")
           names=""
@@ -120,12 +126,15 @@ jobs:
             echo "::$level::Tag v$version already exists; bump the version in packages/*/package.json"
             taken=1
           fi
+          published=""
           for name in $names; do
             if npm view "$name@$version" version >/dev/null 2>&1; then
-              echo "::$level::$name@$version is already published; bump the version in packages/*/package.json"
-              taken=1
+              published="$published $name"
             fi
           done
+          if [ -n "$published" ]; then
+            echo "::warning::Already published at $version, the Publish step skips them:$published"
+          fi
           if [ "$taken" = 1 ] && [ "$DRY_RUN" != "true" ]; then
             exit 1
           fi
@@ -141,21 +150,22 @@ jobs:
           done
           node .github/scripts/check-tarballs.mjs "$VERSION" "$RUNNER_TEMP"/tarballs/*.tgz
 
+      # Skips a package already on npm at this version, so a rerun of a
+      # release that failed halfway resumes it
       - name: Publish
         if: ${{ !inputs.dry-run }}
         env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           DIST_TAG: ${{ inputs.dist-tag }}
           VERSION: ${{ steps.version.outputs.version }}
+          NAMES: ${{ steps.version.outputs.names }}
         run: |
-          if [ -n "$NPM_TOKEN" ]; then
-            echo "::notice::Publishing with the NPM_TOKEN secret. Configure trusted publishing for every package and delete the secret after this release."
-            export NODE_AUTH_TOKEN="$NPM_TOKEN"
-          fi
-          for tarball in \
-            "$RUNNER_TEMP/tarballs/memebattle-build-conditions-$VERSION.tgz" \
-            "$RUNNER_TEMP/tarballs/memebattle-build-conditions-swc-$VERSION.tgz" \
-            "$RUNNER_TEMP/tarballs/memebattle-build-conditions-vite-$VERSION.tgz"; do
+          for name in $NAMES; do
+            if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+              echo "::notice::$name@$VERSION is already on npm, skipping it"
+              continue
+            fi
+            # pnpm pack names @scope/name as scope-name-<version>.tgz
+            tarball="$RUNNER_TEMP/tarballs/$(echo "${name#@}" | tr / -)-$VERSION.tgz"
             npm publish "$tarball" --provenance --access public --tag "$DIST_TAG"
           done
 

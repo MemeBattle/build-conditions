@@ -5,6 +5,7 @@ it inlines the matching condition branch and removes the dead ones together
 with their imports, in both `vite build` and `vite dev`.
 
 ```bash
+pnpm add @memebattle/build-conditions
 pnpm add -D @memebattle/build-conditions-vite
 ```
 

@@ -19,14 +19,15 @@ tests, Storybook and dev setups need no special build.
 The repository is a pnpm workspace of three packages, released together under
 one version number:
 
-| Package                                              | Purpose                                                                            | Dependencies                                                         |
-| ---------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| [`@memebattle/build-conditions`](packages/core)      | the runtime helpers, `./testing`, `./storybook-addon` and the `PluginOptions` type | none; `react` is an optional peer                                    |
-| [`@memebattle/build-conditions-swc`](packages/swc)   | the SWC wasm plugin (swc, rspack, Next.js)                                         | none                                                                 |
-| [`@memebattle/build-conditions-vite`](packages/vite) | the Vite plugin, a JS port of the SWC plugin                                       | `oxc-parser`, `magic-string`; `vite >=6.3` peer (7 and 8 are tested) |
+| Package                                              | Purpose                                                                            | Dependencies                                                                               |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [`@memebattle/build-conditions`](packages/core)      | the runtime helpers, `./testing`, `./storybook-addon` and the `PluginOptions` type | none; `react` is an optional peer                                                          |
+| [`@memebattle/build-conditions-swc`](packages/swc)   | the SWC wasm plugin (swc, rspack, Next.js)                                         | none                                                                                       |
+| [`@memebattle/build-conditions-vite`](packages/vite) | the Vite plugin, a JS port of the SWC plugin                                       | `oxc-parser`, `magic-string`; peers `vite >=6.3` (7 and 8 are tested) and the core package |
 
-Neither plugin depends on the core package at runtime. Install the core
-package as a dependency and one of the plugins as a dev dependency.
+Neither plugin imports the core package at runtime; the Vite plugin takes its
+option types from it, so it declares the core package as a peer. Install the
+core package as a dependency and one of the plugins as a dev dependency.
 
 ## Declaring condition groups
 
@@ -337,10 +338,10 @@ step except the publish). The job runs in the `npm` environment, so it waits
 for one of the environment's required reviewers to approve it in the Actions
 UI before it starts. It then checks formatting, type-checks, runs the jest and
 cargo tests and builds both plugins. It stops when the package versions
-differ, when the `v<version>` tag exists or when any of the packages already
-has that version on npm. Otherwise it packs the three tarballs with
-`pnpm pack`, prints and checks their contents, publishes each of them with
-provenance, then pushes a `v<version>` tag and creates the GitHub release.
+differ or when the `v<version>` tag exists. Otherwise it packs the three tarballs with
+`pnpm pack`, prints and checks their contents, publishes with provenance each
+of them that is not on npm yet, then pushes a `v<version>` tag and creates the
+GitHub release.
 `main` accepts pull requests only.
 
 The tarballs contain `README.md`, `LICENSE` and:
@@ -353,15 +354,16 @@ The tarballs contain `README.md`, `LICENSE` and:
 Check them locally with `pnpm run build`, then `pnpm pack` in each package
 directory and `node .github/scripts/check-tarballs.mjs <version> *.tgz`.
 
-Each package publishes through npm trusted publishing, bound to the workflow
-and the `npm` environment. Trusted publishing can be bound only to a package
-that exists, so the first release of a new package name goes out with a
-temporary `NPM_TOKEN` repository secret (a granular access token with publish
-rights). After that release, bind the new name with
+Each package publishes through npm trusted publishing only, bound to the
+workflow and the `npm` environment. Trusted publishing can be bound only to a
+package that already exists on npm, so a maintainer publishes the first
+version of a new package name once by hand, from its packed tarball, then binds
+the name with
 `npm trust github <name> --repo MemeBattle/build-conditions --file publish.yml --environment npm --allow-publish`
-and delete the secret. If a release fails after publishing some of the
-packages, rerunning it hits the version guard: bump the patch version and
-release again.
+and runs the workflow for the same version: it skips the packages already on
+npm and publishes the rest. Every later release goes through the workflow
+alone. If a release fails after publishing some of the packages, rerun it: the
+version guard only warns about them and the publish step skips them.
 
 ## License
 
